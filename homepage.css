@@ -1,0 +1,110 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 24px;
+  border: 1px solid grey;
+}
+
+h1 {
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+input {
+  width: 320px;
+  max-width: 100%;
+  padding: 8px;
+  margin-right: 8px;
+}
+
+button {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+#requestMessage {
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+h2 {
+  margin-top: 20px;
+  margin-bottom: 8px;
+}
+
+#scheduleOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.schedule-option-btn {
+  border: 1px solid #bbb;
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.schedule-option-btn.active {
+  border-color: #2d6cdf;
+  background: #e9f3ff;
+}
+
+#selectedSections {
+  border: 1px solid #ddd;
+  background: #f9f9f9;
+  padding: 12px;
+  min-height: 28px;
+}
+
+.section-item {
+  padding: 6px 0;
+  border-bottom: 1px solid #ececec;
+}
+
+.section-item.ideal {
+  background: #d7e9ff;
+}
+
+.section-item:last-child {
+  border-bottom: none;
+}
+
+#scheduleGrid {
+  overflow-x: auto;
+}
+
+#scheduleGrid table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 640px;
+}
+
+#scheduleGrid th,
+#scheduleGrid td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+#scheduleGrid th {
+  background: #f0f0f0;
+}
+
+#scheduleGrid td.has-class {
+  background: #e9f3ff;
+}
+
+#scheduleGrid td.has-ideal-class {
+  background: #c8e0ff;
+}
+
+#courses {
+  margin-top: 20px;
+}

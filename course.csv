@@ -1,0 +1,9 @@
+course_id,course_name,course_number,credits,tricky_scale
+1,"Child Dev",CSE210,3,M
+2,"Algorithms and Complexity",CSE381,3,M
+3,"Professional Career",CSE397,3,E
+4,"Applied Calculus for Data Analysis",MATH119,4,VH
+5,"Senior Project",CSE499,3,M
+6,"Big Data Programming",DS460,3,H
+7,"Linear Algebra",MATH341,3,VH
+8,"Developing AI Systems",CSE455,3,H
