@@ -5,34 +5,61 @@ from itertools import product
 app = Flask(__name__, static_folder="userface", static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 
-
-@app.after_request
-def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    return response
-
-MAX_REQUESTED_COURSES = 8
-MAX_COMBINATIONS_CHECKED = 50000
-MAX_SCHEDULES_RETURNED = 5
-
+MAX_COURSES_PER_REQUEST = 8
+MAX_COMBOS_TO_CHECK = 50000
+MAX_SCHEDULES_TO_RETURN = 5
 
 sections = pd.read_csv("section.csv")
-courses = pd.read_csv("Course.csv")
-teachers = pd.read_csv("Teacher.csv")
+courses = pd.read_csv("course.csv")
+teachers = pd.read_csv("teacher.csv")
 
 sections.columns = sections.columns.str.strip()
 courses.columns = courses.columns.str.strip()
 teachers.columns = teachers.columns.str.strip()
 
-df = sections.merge(courses, on='course_id').merge(teachers, on='teacher_id')
-available_course_numbers = courses['course_number'].astype(str).str.upper().tolist()
+all_data = sections.merge(courses, on='course_id')
+all_data = all_data.merge(teachers, on='teacher_id')
+
+course_list = []
+for num in courses['course_number']:
+    num_upper = str(num).upper()
+    if num_upper not in course_list:
+        course_list.append(num_upper)
 
 
 @app.route("/")
 def home():
     return app.send_static_file("index.html")
+
+
+def to_min(time_value):
+    parts = str(time_value).split(':')
+    return int(parts[0]) * 60 + int(parts[1])
+
+
+def time_label(time_value):
+    if pd.isna(time_value):
+        return None
+
+    parts = str(time_value).split(':')
+    hour = int(parts[0])
+    minute = int(parts[1])
+
+    period = "AM"
+    if hour >= 12:
+        period = "PM"
+        if hour > 12:
+            hour = hour - 12
+    if hour == 0:
+        hour = 12
+
+    return str(hour) + ":" + str(minute).zfill(2) + " " + period
+
+
+def clean_value(value):
+    if pd.isna(value):
+        return None
+    return value
 
 
 def times_overlap(day1, start1, end1, day2, start2, end2):
@@ -48,43 +75,38 @@ def times_overlap(day1, start1, end1, day2, start2, end2):
     if pd.isna(start1) or pd.isna(end1) or pd.isna(start2) or pd.isna(end2):
         return False
 
-    if not set(day1).intersection(set(day2)):
+    has_matching_day = False
+    for char in day1:
+        if char in day2:
+            has_matching_day = True
+            break
+    
+    if not has_matching_day:
         return False
 
-    def to_min(t):
-        h, m, _ = t.split(':')
-        return int(h) * 60 + int(m)
+    class1_start = to_min(start1)
+    class1_end = to_min(end1)
+    class2_start = to_min(start2)
+    class2_end = to_min(end2)
 
-    return not (to_min(end1) <= to_min(start2) or to_min(end2) <= to_min(start1))
+    they_dont_overlap = (class1_end <= class2_start) or (class2_end <= class1_start)
+    return not they_dont_overlap
 
 
 def has_conflict(schedule):
     for i in range(len(schedule)):
         for j in range(i+1, len(schedule)):
-            s1, s2 = schedule[i], schedule[j]
+            class1 = schedule[i]
+            class2 = schedule[j]
             if times_overlap(
-                s1['day'], s1['start_time'], s1['end_time'],
-                s2['day'], s2['start_time'], s2['end_time']
+                class1['day'], class1['start_time'], class1['end_time'],
+                class2['day'], class2['start_time'], class2['end_time']
             ):
                 return True
     return False
 
 
-def format_time_label(value):
-    if pd.isna(value):
-        return None
-    parsed = pd.to_datetime(str(value), format="%H:%M:%S")
-    if pd.isna(parsed):
-        return str(value)
-    return parsed.strftime("%I:%M %p").lstrip("0")
-
-
-def serialize_section(section):
-    def clean_value(value):
-        if pd.isna(value):
-            return None
-        return value
-
+def clean_section(section):
     return {
         "course_number": clean_value(section["course_number"]),
         "course_name": clean_value(section["course_name"]),
@@ -92,32 +114,38 @@ def serialize_section(section):
         "day": clean_value(section["day"]),
         "start_time": clean_value(section["start_time"]),
         "end_time": clean_value(section["end_time"]),
-        "start_label": format_time_label(section["start_time"]),
-        "end_label": format_time_label(section["end_time"]),
+        "start_label": time_label(section["start_time"]),
+        "end_label": time_label(section["end_time"]),
         "teacher_name": clean_value(section["teacher_name"])
     }
 
 
-def resolve_course_input(raw_value):
-    value = raw_value.strip().upper()
-    if not value:
-        return None, "empty"
+def check_course(user_input):
+    code = user_input.strip().upper()
+    
+    if not code:
+        return None, "empty", None
 
-    if value in available_course_numbers:
-        return value, None
+    if code in course_list:
+        return code, None, None
 
-    if value.isdigit():
-        matches = [course for course in available_course_numbers if course.endswith(value)]
-        if len(matches) == 1:
-            return matches[0], None
-        if len(matches) > 1:
-            return None, {"type": "ambiguous", "input": value, "matches": matches}
+    if code.isdigit():
+        found_matches = []
+        for course_code in course_list:
+            if course_code.endswith(code):
+                found_matches.append(course_code)
+        
+        if len(found_matches) == 1:
+            return found_matches[0], None, None
+        
+        if len(found_matches) > 1:
+            return None, "ambiguous", found_matches
 
-    return None, {"type": "missing", "input": value}
+    return None, "missing", None
 
 
 @app.route("/schedule", methods=["POST", "OPTIONS"])
-def generate_schedule():
+def make_schedule():
     if request.method == "OPTIONS":
         return ("", 204)
 
@@ -129,74 +157,89 @@ def generate_schedule():
     if not isinstance(desired_courses, list) or not desired_courses:
         return jsonify({"error": "'courses' must be a non-empty list."}), 400
 
-    if len(desired_courses) > MAX_REQUESTED_COURSES:
+    if len(desired_courses) > MAX_COURSES_PER_REQUEST:
         return jsonify({
-            "error": f"A maximum of {MAX_REQUESTED_COURSES} courses is allowed per request."
+            "error": f"A maximum of {MAX_COURSES_PER_REQUEST} courses is allowed per request."
         }), 400
 
-    normalized_courses = []
-    ambiguous_inputs = []
-    missing_inputs = []
-    for item in desired_courses:
-        if not isinstance(item, str):
+    valid_courses = []
+    ambiguous_courses = []
+    missing_courses = []
+    for user_course in desired_courses:
+        if not isinstance(user_course, str):
             return jsonify({"error": "Each course must be a string."}), 400
-        resolved, issue = resolve_course_input(item)
-        if issue == "empty":
+        resolved, issue_type, matches = check_course(user_course)
+        if issue_type == "empty":
             return jsonify({"error": "Course values cannot be empty."}), 400
-        if isinstance(issue, dict) and issue.get("type") == "ambiguous":
-            ambiguous_inputs.append(issue)
+        if issue_type == "ambiguous":
+            ambiguous_courses.append({
+                "type": "ambiguous",
+                "input": user_course.strip().upper(),
+                "matches": matches
+            })
             continue
-        if isinstance(issue, dict) and issue.get("type") == "missing":
-            missing_inputs.append(issue["input"])
+        if issue_type == "missing":
+            missing_courses.append(user_course.strip().upper())
             continue
-        normalized_courses.append(resolved)
+        valid_courses.append(resolved)
 
-    if ambiguous_inputs:
+    if ambiguous_courses:
         return jsonify({
             "error": "Some course inputs are ambiguous. Use full course codes.",
-            "ambiguous_inputs": ambiguous_inputs
+            "ambiguous_inputs": ambiguous_courses
         }), 400
 
-    if missing_inputs:
+    if missing_courses:
         return jsonify({
             "error": "Some course inputs were not found.",
-            "missing_inputs": missing_inputs
+            "missing_inputs": missing_courses
         }), 400
 
-    desired_courses = list(dict.fromkeys(normalized_courses))
+    final_courses = []
+    already_added = set()
+    for course in valid_courses:
+        if course not in already_added:
+            final_courses.append(course)
+            already_added.add(course)
 
-    filtered = df[df['course_number'].isin(desired_courses)]
+    matching_data = all_data[all_data['course_number'].isin(final_courses)]
 
-    course_sections = {
-        c: filtered[filtered['course_number'] == c].to_dict('records')
-        for c in desired_courses
-    }
+    sections_by_course = {}
+    for course_num in final_courses:
+        course_rows = matching_data[matching_data['course_number'] == course_num].to_dict('records')
+        sections_by_course[course_num] = course_rows
 
-    if any(len(sections_list) == 0 for sections_list in course_sections.values()):
-        missing = [c for c, sections_list in course_sections.items() if len(sections_list) == 0]
-        return jsonify({"error": "Courses not found.", "missing_courses": missing}), 400
+    not_found = []
+    for course_num, section_list in sections_by_course.items():
+        if len(section_list) == 0:
+            not_found.append(course_num)
 
-    combos = product(*course_sections.values())
+    if not_found:
+        return jsonify({"error": "Courses not found.", "missing_courses": not_found}), 400
 
-    valid = []
-    checked = 0
-    for combo in combos:
-        checked += 1
-        if checked > MAX_COMBINATIONS_CHECKED:
+    combos = product(*sections_by_course.values())
+
+    good_schedules = []
+    combos_tested = 0
+    for schedule_combo in combos:
+        combos_tested += 1
+        if combos_tested > MAX_COMBOS_TO_CHECK:
             break
-        if not has_conflict(combo):
-            valid.append(combo)
-            if len(valid) >= MAX_SCHEDULES_RETURNED:
+        if not has_conflict(schedule_combo):
+            good_schedules.append(schedule_combo)
+            if len(good_schedules) >= MAX_SCHEDULES_TO_RETURN:
                 break
 
-    serialized_schedules = [
-        [serialize_section(section) for section in schedule]
-        for schedule in valid[:MAX_SCHEDULES_RETURNED]
-    ]
+    clean_schedules = []
+    for schedule in good_schedules[:MAX_SCHEDULES_TO_RETURN]:
+        clean_schedule = []
+        for section in schedule:
+            clean_schedule.append(clean_section(section))
+        clean_schedules.append(clean_schedule)
 
-    selected_sections = serialized_schedules[0] if serialized_schedules else []
+    first_schedule = clean_schedules[0] if clean_schedules else []
 
     return jsonify({
-        "valid_schedules": serialized_schedules,
-        "selected_sections": selected_sections
+        "valid_schedules": clean_schedules,
+        "selected_sections": first_schedule
     })
