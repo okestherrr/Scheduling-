@@ -1,30 +1,37 @@
 <!DOCTYPE html>
 <html>
-    <head>
-      <title>Class Scheduler</title>
-      <link rel="stylesheet" href="/index.css" />
-      <script src="https://www.gstatic.com/firebasejs/9.25.0/firebase-app-compat.js"></script>
-      <script src="https://www.gstatic.com/firebasejs/9.25.0/firebase-firestore-compat.js"></script>
-      <script src="/config.js"></script>
-      <script src="/homepage.js" defer></script>
-    </head>
-      <body>
+  <head>
+    <title>Class Scheduler</title>
+    <link rel="stylesheet" href="./homepage.css" />
+    <script src="https://www.gstatic.com/firebasejs/9.25.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.25.0/firebase-firestore-compat.js"></script>
+    <script src="./config.js"></script>
+    <script src="./homepage.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="hero">
         <h1>Your Class Scheduler</h1>
-        <div>
-          <label for="classRequest">Enter class codes(comma separated):</label>
-          <input id="classRequest" type="text" placeholder="Abc123,456" />
+        <p class="hero-copy">Build schedule options and view each result in a weekly calendar.</p>
+
+        <label for="classRequest">Enter class codes (comma separated):</label>
+        <div class="request-row">
+          <input id="classRequest" type="text" placeholder="CSE210,MATH119" />
           <button id="generateBtn" type="button">Get My Schedule</button>
-            </div>
-               <p id="requestMessage"></p>
-            <h2>Schedule options</h2>
-              <div id="scheduleOptions"></div>
-            <h2>Selected classes:</h2>
-               <div id="selectedSections"></div>
-            <h2>Potential schedules:</h2>
-          <div id="scheduleGrid"></div>
-          <div id="courses"></div>
-        </body>
+        </div>
+        <p id="requestMessage"></p>
+      </section>
+
+      <section class="results-panel">
+        <h2>Schedule Options</h2>
+        <div id="scheduleOptions"></div>
+
+        <h2>Selected Classes</h2>
+        <div id="selectedSections"></div>
+
+        <h2>Weekly Calendar</h2>
+        <div id="scheduleGrid"></div>
+      </section>
+    </main>
+  </body>
 </html>
-<!-- maybe add api to have a bot to talk to about scheduling. "it is recommended to not take 4 3 credit courses. 
- also the rate my professor integration can change warning" -->
- <!-- api could be used to ask about courses and what they are about -->

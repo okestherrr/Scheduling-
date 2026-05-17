@@ -1,4 +1,4 @@
-const firebaseConfig = {
+const firebaseSettings = {
   apiKey: "YOUR_API_KEY",
   authDomain: "class-scheduler.firebaseapp.com",
   projectId: "class-scheduler",
@@ -7,314 +7,424 @@ const firebaseConfig = {
   appId: "APP_ID"
 };
 
-const API_BASE_URL = (window.API_BASE_URL || "").trim();
-const hasValidApiBase = API_BASE_URL && !API_BASE_URL.includes("REPLACE_WITH_YOUR_BACKEND_URL");
-const isLocalhost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
-const resolvedApiBase = hasValidApiBase
-  ? API_BASE_URL.replace(/\/$/, "")
-  : (isLocalhost ? "http://127.0.0.1:5000" : "");
-const SCHEDULE_ENDPOINT = resolvedApiBase ? `${resolvedApiBase}/schedule` : "/schedule";
+const apiBaseText = (window.API_BASE_URL || "").trim();
+const hasCustomApiUrl = apiBaseText && !apiBaseText.includes("REPLACE_WITH_YOUR_BACKEND_URL");
+const isOnLocalhost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+const apiBaseUrl = hasCustomApiUrl
+  ? apiBaseText.replace(/\/$/, "")
+  : (isOnLocalhost ? "http://127.0.0.1:5000" : "");
+const scheduleUrl = apiBaseUrl ? `${apiBaseUrl}/schedule` : "/schedule";
+const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
-function getScheduleEndpoints() {
-  const endpoints = [];
+function getScheduleUrls() {
+  const urlList = [];
 
-  if (hasValidApiBase) {
-    endpoints.push(`${API_BASE_URL.replace(/\/$/, "")}/schedule`);
+  if (hasCustomApiUrl) {
+    urlList.push(`${apiBaseText.replace(/\/$/, "")}/schedule`);
   }
 
   if (window.location.origin && window.location.origin.startsWith("http")) {
-    endpoints.push(`${window.location.origin.replace(/\/$/, "")}/schedule`);
+    urlList.push(`${window.location.origin.replace(/\/$/, "")}/schedule`);
   }
 
-  endpoints.push("http://127.0.0.1:5000/schedule");
-  endpoints.push("http://localhost:5000/schedule");
-  endpoints.push(SCHEDULE_ENDPOINT);
+  urlList.push("http://127.0.0.1:5000/schedule");
+  urlList.push("http://localhost:5000/schedule");
+  urlList.push(scheduleUrl);
 
-  return [...new Set(endpoints)];
+  return [...new Set(urlList)];
 }
 
-async function postScheduleRequest(payload) {
-  const endpoints = getScheduleEndpoints();
-  let lastNetworkError = null;
 
-  for (const endpoint of endpoints) {
+function shouldUseResponse(serverResponse) {
+  const contentType = serverResponse.headers.get("content-type") || "";
+  const hasJsonText = contentType.includes("application/json");
+
+  if (serverResponse.ok) {
+    return true;
+  }
+
+  return serverResponse.status === 400 && hasJsonText;
+}
+
+async function sendScheduleRequest(requestBody) {
+  const urlList = getScheduleUrls();
+  let lastConnectionError = null;
+  let lastBadResponse = null;
+
+  for (const url of urlList) {
     try {
-      const response = await fetch(endpoint, {
+      const serverResponse = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(requestBody)
       });
 
-      return { response, endpoint };
+      if (shouldUseResponse(serverResponse)) {
+        return { response: serverResponse, url };
+      }
+
+      lastBadResponse = { response: serverResponse, url };
     } catch (error) {
-      lastNetworkError = error;
+      lastConnectionError = error;
     }
   }
 
-  throw lastNetworkError || new Error("Could not connect to any scheduler API endpoint.");
+  if (lastBadResponse) {
+    return lastBadResponse;
+  }
+
+  throw lastConnectionError || new Error("Could not connect to any scheduler API endpoint.");
 }
 
-let db = null;
+let firebaseDb = null;
 
 try {
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore();
+  firebase.initializeApp(firebaseSettings);
+  firebaseDb = firebase.firestore();
 } catch (error) {
   console.warn("Firebase initialization failed:", error);
 }
 
-if (db) {
-  db.collection("courses").get().then(snapshot => {
-    const container = document.getElementById("courses");
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      const div = document.createElement("div");
-      div.textContent = `${data.course_number}: ${data.course_name} (${data.credits} credits)`;
-      container.appendChild(div);
-    });
-  }).catch(error => {
+if (firebaseDb) {
+  firebaseDb.collection("courses").get().catch(error => {
     console.warn("Could not load Firebase courses:", error);
   });
 }
 
-let potentialSchedules = [];
-let selectedScheduleIndex = 0;
+let scheduleChoices = [];
+let chosenScheduleIndex = 0;
 
-function parseTimeToMinutes(value) {
-  if (!value || value === "NULL") {
-    return null;
-  }
-
-  const [hourText, minuteText] = String(value).split(":");
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-
-  if (Number.isNaN(hour) || Number.isNaN(minute)) {
-    return null;
-  }
-
-  return (hour * 60) + minute;
+function getBox(boxId) {
+  return document.getElementById(boxId);
 }
 
-function formatMinutes(minutes) {
-  const hour24 = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  const period = hour24 >= 12 ? "PM" : "AM";
+
+function clearScheduleBoxes() {
+  getBox("scheduleOptions").textContent = "";
+  getBox("selectedSections").textContent = "";
+  getBox("scheduleGrid").textContent = "";
+}
+
+
+function getTypedClasses() {
+  const typedText = getBox("classRequest").value;
+
+  return typedText
+    .split(",")
+    .map(oneClass => oneClass.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function timeTextToMinutes(timeText) {
+  if (!timeText || timeText === "NULL") {
+    return null;
+  }
+
+  const [hourText, minuteText] = String(timeText).split(":");
+  const hourNumber = Number(hourText);
+  const minuteNumber = Number(minuteText);
+
+  if (Number.isNaN(hourNumber) || Number.isNaN(minuteNumber)) {
+    return null;
+  }
+
+  return (hourNumber * 60) + minuteNumber;
+}
+
+function minutesToClock(totalMinutes) {
+  const hour24 = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  const amOrPm = hour24 >= 12 ? "PM" : "AM";
   const hour12 = ((hour24 + 11) % 12) + 1;
-  return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${amOrPm}`;
 }
 
-function scheduleByDay(sections) {
-  const dayMap = { M: "Mon", T: "Tue", W: "Wed", R: "Thu", F: "Fri" };
-  const grouped = { Mon: [], Tue: [], Wed: [], Thu: [], Fri: [] };
+function splitClassesByDay(classList) {
+  const dayNames = { M: "Mon", T: "Tue", W: "Wed", R: "Thu", F: "Fri" };
+  const classesByDay = {
+    Mon: [],
+    Tue: [],
+    Wed: [],
+    Thu: [],
+    Fri: []
+  };
 
-  sections.forEach(section => {
-    const dayText = section.day || "";
-    if (dayText === "ONLINE") {
+  classList.forEach(classItem => {
+    const classDays = classItem.day || "";
+    if (classDays === "ONLINE") {
       return;
     }
 
-    const start = parseTimeToMinutes(section.start_time);
-    const end = parseTimeToMinutes(section.end_time);
-    if (start === null || end === null) {
+    const startMinutes = timeTextToMinutes(classItem.start_time);
+    const endMinutes = timeTextToMinutes(classItem.end_time);
+    if (startMinutes === null || endMinutes === null) {
       return;
     }
 
-    for (const letter of dayText) {
-      const dayName = dayMap[letter];
+    for (const dayLetter of classDays) {
+      const dayName = dayNames[dayLetter];
       if (!dayName) {
         continue;
       }
 
-      grouped[dayName].push({
-        ...section,
-        start,
-        end
+      classesByDay[dayName].push({
+        ...classItem,
+        start: startMinutes,
+        end: endMinutes
       });
     }
   });
 
-  Object.values(grouped).forEach(entries => entries.sort((a, b) => a.start - b.start));
-  return grouped;
+  Object.values(classesByDay).forEach(dayClasses => dayClasses.sort((a, b) => a.start - b.start));
+  return classesByDay;
 }
 
-function renderSelectedSections(sections) {
-  const container = document.getElementById("selectedSections");
-  container.innerHTML = "";
+function showChosenClasses(classList) {
+  const box = getBox("selectedSections");
+  box.innerHTML = "";
 
-  if (!sections.length) {
-    container.textContent = "No valid sections found.";
+  if (!classList.length) {
+    box.textContent = "No valid sections found.";
     return;
   }
 
-  sections.forEach(section => {
-    const line = document.createElement("div");
-    const isIdeal = Boolean(section.ideal || section.is_ideal);
-    line.className = `section-item${isIdeal ? " ideal" : ""}`;
-    const timeText = section.day === "ONLINE"
+  classList.forEach(classItem => {
+    const rowBox = document.createElement("div");
+    const shouldHighlight = Boolean(classItem.ideal || classItem.is_ideal);
+    rowBox.className = `section-item${shouldHighlight ? " ideal" : ""}`;
+    const meetingText = classItem.day === "ONLINE"
       ? "ONLINE"
-      : `${section.day} ${section.start_label} - ${section.end_label}`;
-    line.textContent = `${section.course_number} (${section.section_number}) - ${timeText} - ${section.teacher_name}`;
-    container.appendChild(line);
+      : `${classItem.day} ${classItem.start_label} - ${classItem.end_label}`;
+    rowBox.textContent = `${classItem.course_number} (${classItem.section_number}) - ${meetingText} - ${classItem.teacher_name}`;
+    box.appendChild(rowBox);
   });
 }
 
-function renderScheduleGrid(sections) {
-  const container = document.getElementById("scheduleGrid");
-  container.innerHTML = "";
 
-  const dayColumns = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-  const grouped = scheduleByDay(sections);
+function makeCalendarInfo(classList) {
+  const classesByDay = splitClassesByDay(classList);
+  const allClassTimes = Object.values(classesByDay).flat();
 
-  const allMeetings = Object.values(grouped).flat();
-  if (!allMeetings.length) {
-    container.textContent = "Only online classes in this schedule.";
+  if (!allClassTimes.length) {
+    return { classesByDay, allClassTimes };
+  }
+
+  const earliestTime = Math.min(...allClassTimes.map(classItem => classItem.start));
+  const latestTime = Math.max(...allClassTimes.map(classItem => classItem.end));
+  const firstHour = Math.max(7, Math.floor(earliestTime / 60));
+  const lastHour = Math.min(22, Math.ceil(latestTime / 60));
+  const pixelsPerMinute = 1.1;
+  const totalHeight = (lastHour - firstHour) * 60 * pixelsPerMinute;
+
+  return {
+    classesByDay,
+    allClassTimes,
+    firstHour,
+    lastHour,
+    pixelsPerMinute,
+    totalHeight
+  };
+}
+
+
+function makeTimeSide(firstHour, lastHour, pixelsPerMinute) {
+  const timeBox = document.createElement("div");
+  timeBox.className = "calendar-times";
+
+  for (let hour = firstHour; hour <= lastHour; hour += 1) {
+    const labelBox = document.createElement("div");
+    labelBox.className = "calendar-time-label";
+    labelBox.style.top = `${(hour - firstHour) * 60 * pixelsPerMinute}px`;
+    labelBox.textContent = minutesToClock(hour * 60);
+    timeBox.appendChild(labelBox);
+  }
+
+  return timeBox;
+}
+
+
+function addHourLines(trackBox, firstHour, lastHour, pixelsPerMinute) {
+  for (let hour = firstHour; hour < lastHour; hour += 1) {
+    const lineBox = document.createElement("div");
+    lineBox.className = "calendar-hour-line";
+    lineBox.style.top = `${(hour - firstHour) * 60 * pixelsPerMinute}px`;
+    trackBox.appendChild(lineBox);
+  }
+}
+
+
+function makeClassCard(classItem, firstHour, pixelsPerMinute) {
+  const cardBox = document.createElement("article");
+  const cardTop = (classItem.start - (firstHour * 60)) * pixelsPerMinute;
+  const cardHeight = Math.max(54, (classItem.end - classItem.start) * pixelsPerMinute);
+  const shouldHighlight = classItem.ideal || classItem.is_ideal;
+
+  cardBox.className = `calendar-class-card${shouldHighlight ? " ideal" : ""}`;
+  cardBox.style.top = `${cardTop}px`;
+  cardBox.style.height = `${cardHeight}px`;
+  cardBox.innerHTML = `
+    <strong>${classItem.course_number}</strong>
+    <span>Section ${classItem.section_number}</span>
+    <span>${classItem.start_label} - ${classItem.end_label}</span>
+    <small>${classItem.teacher_name}</small>
+  `;
+
+  return cardBox;
+}
+
+
+function makeDayColumn(dayName, classesByDay, totalHeight, firstHour, lastHour, pixelsPerMinute) {
+  const dayBox = document.createElement("section");
+  dayBox.className = "calendar-day";
+
+  const headerBox = document.createElement("header");
+  headerBox.className = "calendar-day-header";
+  headerBox.textContent = dayName;
+  dayBox.appendChild(headerBox);
+
+  const trackBox = document.createElement("div");
+  trackBox.className = "calendar-day-track";
+  trackBox.style.height = `${totalHeight}px`;
+
+  addHourLines(trackBox, firstHour, lastHour, pixelsPerMinute);
+
+  classesByDay[dayName].forEach(classItem => {
+    trackBox.appendChild(makeClassCard(classItem, firstHour, pixelsPerMinute));
+  });
+
+  dayBox.appendChild(trackBox);
+  return dayBox;
+}
+
+function showCalendar(classList) {
+  const box = getBox("scheduleGrid");
+  box.innerHTML = "";
+
+  const calendarInfo = makeCalendarInfo(classList);
+  const {
+    classesByDay,
+    allClassTimes,
+    firstHour,
+    lastHour,
+    pixelsPerMinute,
+    totalHeight
+  } = calendarInfo;
+
+  if (!allClassTimes.length) {
+    box.textContent = "Only online classes in this schedule.";
     return;
   }
 
-  const earliest = Math.min(...allMeetings.map(item => item.start));
-  const latest = Math.max(...allMeetings.map(item => item.end));
+  const calendarBox = document.createElement("div");
+  calendarBox.className = "calendar-board";
 
-  const startHour = Math.floor(earliest / 60);
-  const endHour = Math.ceil(latest / 60);
+  calendarBox.appendChild(makeTimeSide(firstHour, lastHour, pixelsPerMinute));
 
-  const table = document.createElement("table");
-  const head = document.createElement("thead");
-  const headRow = document.createElement("tr");
+  const dayBoxes = document.createElement("div");
+  dayBoxes.className = "calendar-days";
 
-  const timeHead = document.createElement("th");
-  timeHead.textContent = "Time";
-  headRow.appendChild(timeHead);
-
-  dayColumns.forEach(day => {
-    const th = document.createElement("th");
-    th.textContent = day;
-    headRow.appendChild(th);
+  weekDays.forEach(dayName => {
+    dayBoxes.appendChild(
+      makeDayColumn(dayName, classesByDay, totalHeight, firstHour, lastHour, pixelsPerMinute)
+    );
   });
 
-  head.appendChild(headRow);
-  table.appendChild(head);
+  calendarBox.appendChild(dayBoxes);
+  box.appendChild(calendarBox);
+}
 
-  const body = document.createElement("tbody");
 
-  for (let hour = startHour; hour < endHour; hour += 1) {
-    const row = document.createElement("tr");
-    const rowStart = hour * 60;
-    const rowEnd = (hour + 1) * 60;
+function showCurrentSchedule() {
+  const classList = scheduleChoices[chosenScheduleIndex] || [];
+  showChosenClasses(classList);
+  showCalendar(classList);
+}
 
-    const timeCell = document.createElement("td");
-    timeCell.textContent = `${formatMinutes(rowStart)} - ${formatMinutes(rowEnd)}`;
-    row.appendChild(timeCell);
+function showScheduleButtons() {
+  const box = getBox("scheduleOptions");
+  box.innerHTML = "";
 
-    dayColumns.forEach(day => {
-      const cell = document.createElement("td");
-      const classes = grouped[day].filter(item => item.start < rowEnd && item.end > rowStart);
+  if (!scheduleChoices.length) {
+    box.textContent = "No potential schedules available.";
+    return;
+  }
 
-      if (classes.length) {
-        const hasIdealClass = classes.some(item => item.ideal || item.is_ideal);
-        cell.className = hasIdealClass ? "has-class has-ideal-class" : "has-class";
-        cell.innerHTML = classes.map(item => {
-          return `${item.course_number} (${item.section_number})<br>${item.teacher_name}<br>${item.start_label} - ${item.end_label}`;
-        }).join("<hr>");
-      }
-
-      row.appendChild(cell);
+  scheduleChoices.forEach((_, buttonIndex) => {
+    const optionButton = document.createElement("button");
+    optionButton.type = "button";
+    optionButton.className = `schedule-option-btn${buttonIndex === chosenScheduleIndex ? " active" : ""}`;
+    optionButton.textContent = `Option ${buttonIndex + 1}`;
+    optionButton.addEventListener("click", () => {
+      chosenScheduleIndex = buttonIndex;
+      showScheduleButtons();
+      showCurrentSchedule();
     });
-
-    body.appendChild(row);
-  }
-
-  table.appendChild(body);
-  container.appendChild(table);
-}
-
-function renderScheduleOptions() {
-  const container = document.getElementById("scheduleOptions");
-  container.innerHTML = "";
-
-  if (!potentialSchedules.length) {
-    container.textContent = "No potential schedules available.";
-    return;
-  }
-
-  potentialSchedules.forEach((_, index) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `schedule-option-btn${index === selectedScheduleIndex ? " active" : ""}`;
-    button.textContent = `Option ${index + 1}`;
-    button.addEventListener("click", () => {
-      selectedScheduleIndex = index;
-      renderScheduleOptions();
-      renderSelectedSections(potentialSchedules[selectedScheduleIndex]);
-      renderScheduleGrid(potentialSchedules[selectedScheduleIndex]);
-    });
-    container.appendChild(button);
+    box.appendChild(optionButton);
   });
 }
 
-async function submitClassRequest() {
-  const input = document.getElementById("classRequest").value;
-  const requestMessage = document.getElementById("requestMessage");
-  const selectedContainer = document.getElementById("selectedSections");
-  const gridContainer = document.getElementById("scheduleGrid");
-  const optionsContainer = document.getElementById("scheduleOptions");
 
-  const courses = input
-    .split(",")
-    .map(value => value.trim().toUpperCase())
-    .filter(Boolean);
+async function readScheduleData(serverResponse) {
+  const contentType = serverResponse.headers.get("content-type") || "";
 
-  if (courses.length === 0) {
-    requestMessage.textContent = "Please enter at least one class code.";
-    optionsContainer.textContent = "";
-    selectedContainer.textContent = "";
-    gridContainer.textContent = "";
+  if (contentType.includes("application/json")) {
+    return serverResponse.json();
+  }
+
+  return { error: await serverResponse.text() };
+}
+
+
+function showErrorMessage(message) {
+  getBox("requestMessage").textContent = message;
+  clearScheduleBoxes();
+}
+
+
+function showSchedulesFromServer(serverData) {
+  scheduleChoices = serverData.valid_schedules || [];
+  chosenScheduleIndex = 0;
+
+  getBox("requestMessage").textContent = scheduleChoices.length
+    ? `Showing ${scheduleChoices.length} potential schedule(s).`
+    : "No conflict-free schedule found.";
+
+  showScheduleButtons();
+  showCurrentSchedule();
+}
+
+async function submitClassCodes() {
+  const typedClasses = getTypedClasses();
+
+  if (typedClasses.length === 0) {
+    showErrorMessage("Please enter at least one class code.");
     return;
   }
 
-  requestMessage.textContent = "Loading schedules...";
-  optionsContainer.textContent = "";
-  selectedContainer.textContent = "";
-  gridContainer.textContent = "";
+  getBox("requestMessage").textContent = "Loading schedules...";
+  clearScheduleBoxes();
 
   try {
-    const { response } = await postScheduleRequest({ courses });
-
-    const contentType = response.headers.get("content-type") || "";
-    const data = contentType.includes("application/json")
-      ? await response.json()
-      : { error: await response.text() };
+    const { response } = await sendScheduleRequest({ courses: typedClasses });
+    const serverData = await readScheduleData(response);
 
     if (!response.ok) {
-      requestMessage.textContent = data.error || "Request failed.";
-      optionsContainer.textContent = "";
-      selectedContainer.textContent = "";
-      gridContainer.textContent = "";
+      showErrorMessage(serverData.error || "Request failed.");
       return;
     }
 
-    potentialSchedules = data.valid_schedules || [];
-    selectedScheduleIndex = 0;
-
-    const sections = potentialSchedules[selectedScheduleIndex] || [];
-    requestMessage.textContent = potentialSchedules.length
-      ? `Showing ${potentialSchedules.length} potential schedule(s).`
-      : "No conflict-free schedule found.";
-
-    renderScheduleOptions();
-    renderSelectedSections(sections);
-    renderScheduleGrid(sections);
+    showSchedulesFromServer(serverData);
   } catch (error) {
-    requestMessage.textContent = "Could not reach the scheduler API.";
-    optionsContainer.textContent = "";
-    selectedContainer.textContent = "";
-    gridContainer.textContent = `Details: ${error.message}`;
+    getBox("requestMessage").textContent = "Could not reach the scheduler API.";
+    getBox("scheduleOptions").textContent = "";
+    getBox("selectedSections").textContent = "";
+    getBox("scheduleGrid").textContent = `Details: ${error.message}`;
   }
 }
 
-document.getElementById("generateBtn").addEventListener("click", submitClassRequest);
-document.getElementById("classRequest").addEventListener("keydown", event => {
+getBox("generateBtn").addEventListener("click", submitClassCodes);
+getBox("classRequest").addEventListener("keydown", event => {
   if (event.key === "Enter") {
-    submitClassRequest();
+    submitClassCodes();
   }
 });

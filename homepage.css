@@ -1,38 +1,97 @@
+:root {
+  --page-color: #f3efe8;
+  --box-color: rgba(255, 252, 246, 0.92);
+  --box-border: #d5c6ae;
+  --main-color: #1d5c63;
+  --light-main: #d4ece6;
+  --text-color: #1f2933;
+  --soft-text: #5f6c75;
+  --line-color: rgba(29, 92, 99, 0.18);
+  --class-box-color: #f7c66a;
+  --highlight-box-color: #8ecae6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
-  font-family: Arial, sans-serif;
-  margin: 24px;
-  border: 1px solid grey;
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--text-color);
+  background:
+    radial-gradient(circle at top left, rgba(255, 215, 160, 0.45), transparent 30%),
+    linear-gradient(180deg, #f6f0e6 0%, var(--page-color) 100%);
 }
 
-h1 {
-  margin-bottom: 16px;
+.page-shell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
 }
 
-label {
+.hero,
+.results-panel {
+  background: var(--box-color);
+  border: 1px solid var(--box-border);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(91, 70, 38, 0.08);
+}
+
+.hero {
+  margin-bottom: 20px;
+}
+
+.hero h1 {
+  margin: 0 0 8px;
+}
+
+.hero-copy {
+  margin: 0 0 18px;
+  color: var(--soft-text);
+}
+
+.hero label,
+.results-panel h2 {
   display: block;
-  margin-bottom: 8px;
+  margin: 0 0 10px;
+}
+
+.request-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 input {
-  width: 320px;
+  width: min(420px, 100%);
   max-width: 100%;
-  padding: 8px;
-  margin-right: 8px;
+  padding: 11px 14px;
+  border: 1px solid #c8baa4;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
 }
 
 button {
-  padding: 8px 12px;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--main-color);
+  color: #fff;
   cursor: pointer;
 }
 
 #requestMessage {
-  margin-top: 12px;
+  margin: 12px 0 0;
   font-weight: 600;
 }
 
 h2 {
-  margin-top: 20px;
-  margin-bottom: 8px;
+  margin-top: 24px;
+  margin-bottom: 10px;
 }
 
 #scheduleOptions {
@@ -45,14 +104,15 @@ h2 {
 .schedule-option-btn {
   border: 1px solid #bbb;
   background: #fff;
-  padding: 6px 10px;
-  border-radius: 4px;
+  color: var(--text-color);
+  padding: 8px 12px;
+  border-radius: 999px;
   cursor: pointer;
 }
 
 .schedule-option-btn.active {
-  border-color: #2d6cdf;
-  background: #e9f3ff;
+  border-color: var(--main-color);
+  background: var(--light-main);
 }
 
 #selectedSections {
@@ -60,10 +120,11 @@ h2 {
   background: #f9f9f9;
   padding: 12px;
   min-height: 28px;
+  border-radius: 16px;
 }
 
 .section-item {
-  padding: 6px 0;
+  padding: 8px 0;
   border-bottom: 1px solid #ececec;
 }
 
@@ -77,34 +138,112 @@ h2 {
 
 #scheduleGrid {
   overflow-x: auto;
+  padding-bottom: 8px;
 }
 
-#scheduleGrid table {
-  border-collapse: collapse;
-  width: 100%;
-  min-width: 640px;
+.calendar-board {
+  display: grid;
+  grid-template-columns: 90px minmax(760px, 1fr);
+  gap: 14px;
+  align-items: start;
 }
 
-#scheduleGrid th,
-#scheduleGrid td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: left;
-  vertical-align: top;
+.calendar-times {
+  position: relative;
+  min-height: 720px;
 }
 
-#scheduleGrid th {
-  background: #f0f0f0;
+.calendar-time-label {
+  position: absolute;
+  transform: translateY(-50%);
+  color: var(--soft-text);
+  font-size: 0.9rem;
 }
 
-#scheduleGrid td.has-class {
-  background: #e9f3ff;
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 10px;
 }
 
-#scheduleGrid td.has-ideal-class {
-  background: #c8e0ff;
+.calendar-day {
+  min-width: 140px;
 }
 
-#courses {
-  margin-top: 20px;
+.calendar-day-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+  font-weight: 700;
+}
+
+.calendar-day-track {
+  position: relative;
+  border: 1px solid #ddd0ba;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 242, 230, 0.95));
+  overflow: hidden;
+}
+
+.calendar-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line-color);
+}
+
+.calendar-class-card {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--class-box-color);
+  color: #34240b;
+  box-shadow: 0 8px 20px rgba(103, 75, 22, 0.15);
+}
+
+.calendar-class-card.ideal {
+  background: var(--highlight-box-color);
+}
+
+.calendar-class-card span,
+.calendar-class-card small {
+  font-size: 0.84rem;
+}
+
+@media (max-width: 900px) {
+  .calendar-board {
+    grid-template-columns: 70px minmax(700px, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .page-shell {
+    padding: 20px 14px 36px;
+  }
+
+  .hero,
+  .results-panel {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  input,
+  button {
+    width: 100%;
+  }
+
+  .request-row {
+    align-items: stretch;
+  }
 }
