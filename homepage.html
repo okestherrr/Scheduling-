@@ -13,9 +13,7 @@
     <main class="page-shell">
       <section class="hero">
         <h1>Your Class Scheduler</h1>
-        <p class="hero-copy">Build schedule options and view each result in a weekly calendar.</p>
-
-        <label for="classRequest">Enter class codes (comma separated):</label>
+        <label for="classRequest">Enter class codes (seperate with commas):</label>
         <div class="request-row course-request-row">
           <div class="class-search-input-wrap">
             <input id="classRequest" type="text" placeholder="CSE210,MATH119" />
@@ -25,14 +23,12 @@
           <button id="termBtn" class="btn-main btn-term" type="button">Term #</button>
           <button id="teacherBtn" class="btn-main btn-teachers" type="button">Teachers</button>
         </div>
-
         <div id="termPanel" hidden>
           <div class="term-row">
             <label for="termInput">Term number:</label>
             <input id="termInput" type="number" min="1" step="1" placeholder="Term #" />
           </div>
         </div>
-
         <div id="teacherSearchPanel" hidden>
           <label for="teacherRequest">Teacher Search:</label>
           <div class="request-row">
@@ -47,7 +43,6 @@
         <p id="teacherMessage"></p>
         <div id="teacherResults"></div>
       </section>
-
       <section class="results-panel">
         <div class="schedule-options-header">
           <h2>Schedule Options</h2>
@@ -58,10 +53,8 @@
           </div>
         </div>
         <div id="scheduleOptions"></div>
-
         <h2>Selected Classes</h2>
         <div id="selectedSections"></div>
-
         <h2>Weekly Calendar</h2>
         <div id="scheduleGrid"></div>
       </section>

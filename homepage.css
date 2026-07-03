@@ -120,6 +120,7 @@ button {
   background: var(--main-color);
   color: #fff;
   cursor: pointer;
+  box-shadow: none;
 }
 
 .btn-main {
@@ -129,6 +130,7 @@ button {
   background: var(--main-color);
   color: #fff;
   cursor: pointer;
+  box-shadow: none;
 }
 
 #teacherClearBtn,
@@ -259,7 +261,7 @@ h2 {
 }
 
 .schedule-option-btn {
-  border: 1px solid #9abec7;
+  border: none;
   background: #f7fdff;
   color: var(--text-color);
   padding: 8px 12px;
@@ -325,13 +327,62 @@ h2 {
 .calendar-save-btn,
 .btn-options,
 .btn-save {
-  border: 1px solid #158ea7;
+  border: none;
   background: #e7f8fd;
   color: #0d6074;
 }
 
 .calendar-options-btn.active {
   background: #cfeffd;
+}
+
+/* Text-style controls: no box border/background */
+#generateBtn,
+#termBtn,
+#teacherBtn,
+#teacherSearchBtn,
+#loadMoreBtn,
+#manipulateBtn,
+#resetManipulatedBtn,
+.calendar-options-btn {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #0d6074;
+  padding: 0 2px;
+  border-radius: 0 !important;
+}
+
+#generateBtn {
+  background: #e7f8fd !important;
+  border: 1px solid #158ea7 !important;
+  padding: 8px 12px;
+}
+
+#generateBtn:hover,
+#termBtn:hover,
+#teacherBtn:hover,
+#teacherSearchBtn:hover,
+#loadMoreBtn:hover,
+#manipulateBtn:hover,
+#resetManipulatedBtn:hover,
+.calendar-options-btn:hover,
+.calendar-options-btn.active {
+  background: transparent !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+#generateBtn:hover {
+  background: #cfeffd !important;
+}
+
+#teacherClearBtn,
+#classClearBtn {
+  background: transparent;
+  border: none !important;
+  box-shadow: none;
+  color: #0d6074;
 }
 
 .calendar-options-panel {
@@ -527,7 +578,7 @@ h2 {
   height: 34px;
   padding: 0;
   border-radius: 8px;
-  border: 1px solid #158ea7;
+  border: none;
   background: #e7f8fd;
   color: #0d6074;
   font-size: 1rem;
@@ -535,7 +586,7 @@ h2 {
 }
 
 .btn-star {
-  border: 1px solid #158ea7;
+  border: none;
   background: #e7f8fd;
   color: #0d6074;
 }
@@ -667,6 +718,26 @@ h2 {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
+}
+
+/* Sharp-edge theme: remove rounded corners across the app UI. */
+.hero,
+.results-panel,
+input,
+button,
+.btn-main,
+#teacherClearBtn,
+#classClearBtn,
+.teacher-card,
+.teacher-class-item,
+#selectedSections,
+.schedule-option-btn,
+.calendar-options-panel,
+.calendar-save-btn,
+.calendar-favorite-btn,
+.calendar-class-card,
+.calendar-day-header {
+  border-radius: 0 !important;
 }
 
 @media (max-width: 900px) {
