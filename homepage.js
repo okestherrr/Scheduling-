@@ -15,8 +15,10 @@ const apiBaseUrl = hasCustomApiUrl
   : (isOnLocalhost ? "http://127.0.0.1:5000" : "");
 const scheduleUrl = apiBaseUrl ? `${apiBaseUrl}/schedule` : "/schedule";
 const teacherSearchUrl = apiBaseUrl ? `${apiBaseUrl}/teachers/search` : "/teachers/search";
-const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const allCalendarDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const weekdayCalendarDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const schedulePageSize = 5;
+const calendarGapMinutes = 15;
 
 function getApiUrls(pathSuffix) {
   const urlList = [];
@@ -79,6 +81,12 @@ async function sendApiRequest(pathSuffix, requestBody) {
     }
   }
 
+  // If every API attempt failed to connect, prefer that message over
+  // unrelated 404/HTML responses from a non-API origin.
+  if (lastConnectionError) {
+    throw lastConnectionError;
+  }
+
   if (lastBadResponse) {
     return lastBadResponse;
   }
@@ -111,16 +119,24 @@ if (firebaseDb) {
   });
 }
 
-let scheduleChoices = [];
-let chosenScheduleIndex = 0;
-let favoriteScheduleIndexes = new Set();
-let manipulatedScheduleIndexes = new Set();
-let lockedCourseSections = new Map();
+let schedules = [];
+let currentScheduleIndex = 0;
+let favoriteIndexes = new Set();
+let editedIndexes = new Set();
+let lockedSectionsByCourse = new Map();
 let hasMoreSchedules = false;
 let nextScheduleStartIndex = 0;
-let currentScheduleRequest = null;
+let currentRequest = null;
+let calendarResizeTimer = null;
+let calendarOptionsOpen = false;
+let calendarSettings = {
+  startMinutes: 7 * 60,
+  endMinutes: 17 * 60,
+  weekendMode: "none",
+  showDevotional: false
+};
 
-function getBox(boxId) {
+function byId(boxId) {
   return document.getElementById(boxId);
 }
 
@@ -128,7 +144,7 @@ function getResultsPanel() {
   return document.querySelector(".results-panel");
 }
 
-function setResultsPanelVisible(isVisible) {
+function toggleResultsPanel(isVisible) {
   const panelBox = getResultsPanel();
   if (panelBox) {
     panelBox.hidden = !isVisible;
@@ -136,47 +152,47 @@ function setResultsPanelVisible(isVisible) {
 }
 
 
-function setTeacherPanelVisible(isVisible) {
-  const panelBox = getBox("teacherSearchPanel");
+function toggleTeacherPanel(isVisible) {
+  const panelBox = byId("teacherSearchPanel");
   if (panelBox) {
     panelBox.hidden = !isVisible;
   }
 }
 
 
-function setDetailsPanelVisible(isVisible) {
-  const panelBox = getBox("detailsPanel");
+function toggleTermPanel(isVisible) {
+  const panelBox = byId("termPanel");
   if (panelBox) {
     panelBox.hidden = !isVisible;
   }
 }
 
 
-function clearScheduleBoxes() {
-  getBox("scheduleOptions").textContent = "";
-  getBox("selectedSections").textContent = "";
-  getBox("scheduleGrid").textContent = "";
+function clearScheduleUi() {
+  byId("scheduleOptions").textContent = "";
+  byId("selectedSections").textContent = "";
+  byId("scheduleGrid").textContent = "";
 }
 
 
-function setLoadMoreVisible(isVisible) {
-  const loadMoreButton = getBox("loadMoreBtn");
+function toggleLoadMoreBtn(isVisible) {
+  const loadMoreButton = byId("loadMoreBtn");
   if (loadMoreButton) {
     loadMoreButton.hidden = !isVisible;
   }
 }
 
 
-function setManipulateVisible(isVisible) {
-  const manipulateButton = getBox("manipulateBtn");
+function toggleManipulateBtn(isVisible) {
+  const manipulateButton = byId("manipulateBtn");
   if (manipulateButton) {
     manipulateButton.hidden = !isVisible;
   }
 }
 
 
-function setResetManipulatedVisible(isVisible) {
-  const resetButton = getBox("resetManipulatedBtn");
+function toggleResetBtn(isVisible) {
+  const resetButton = byId("resetManipulatedBtn");
   if (resetButton) {
     resetButton.hidden = !isVisible;
   }
@@ -192,12 +208,64 @@ function makeScheduleSignature(scheduleList) {
 
 
 function isFavoriteSchedule(index) {
-  return favoriteScheduleIndexes.has(index);
+  return favoriteIndexes.has(index);
+}
+
+
+function hashText(textValue) {
+  let hashValue = 0;
+
+  for (const oneChar of String(textValue || "")) {
+    hashValue = ((hashValue << 5) - hashValue) + oneChar.charCodeAt(0);
+    hashValue |= 0;
+  }
+
+  return Math.abs(hashValue);
+}
+
+
+function getCoursePalette(courseNumber) {
+  const hashValue = hashText(courseNumber);
+  const hue = hashValue % 360;
+
+  return {
+    sectionBg: `hsl(${hue} 76% 94%)`,
+    sectionBorder: `hsl(${hue} 56% 46%)`,
+    cardBg: `hsl(${hue} 74% 84%)`,
+    cardText: `hsl(${hue} 55% 20%)`,
+    cardBorder: `hsl(${hue} 55% 42%)`
+  };
+}
+
+
+function applyCourseColorStyles(targetBox, classItem, options = {}) {
+  const palette = getCoursePalette(classItem.course_number);
+  const isIdeal = Boolean(classItem.ideal || classItem.is_ideal);
+
+  if (options.forSectionRow) {
+    targetBox.style.backgroundColor = palette.sectionBg;
+    targetBox.style.borderLeft = `4px solid ${palette.sectionBorder}`;
+    targetBox.style.paddingLeft = "8px";
+
+    if (isIdeal) {
+      targetBox.style.filter = "saturate(1.12)";
+    }
+
+    return;
+  }
+
+  targetBox.style.backgroundColor = palette.cardBg;
+  targetBox.style.color = palette.cardText;
+  targetBox.style.border = `1px solid ${palette.cardBorder}`;
+
+  if (isIdeal) {
+    targetBox.style.filter = "saturate(1.12)";
+  }
 }
 
 
 function isLockedSection(classItem) {
-  const lockedSection = lockedCourseSections.get(String(classItem.course_number));
+  const lockedSection = lockedSectionsByCourse.get(String(classItem.course_number));
   if (!lockedSection) {
     return false;
   }
@@ -209,19 +277,19 @@ function isLockedSection(classItem) {
 function toggleLockedSection(classItem) {
   const courseCode = String(classItem.course_number);
   const sectionCode = String(classItem.section_number);
-  const lockedSection = lockedCourseSections.get(courseCode);
+  const lockedSection = lockedSectionsByCourse.get(courseCode);
 
   if (lockedSection === sectionCode) {
-    lockedCourseSections.delete(courseCode);
+    lockedSectionsByCourse.delete(courseCode);
     return;
   }
 
-  lockedCourseSections.set(courseCode, sectionCode);
+  lockedSectionsByCourse.set(courseCode, sectionCode);
 }
 
 
 function getLockedSectionsPayload() {
-  return Array.from(lockedCourseSections.entries()).map(([courseNumber, sectionNumber]) => ({
+  return Array.from(lockedSectionsByCourse.entries()).map(([courseNumber, sectionNumber]) => ({
     course_number: courseNumber,
     section_number: sectionNumber
   }));
@@ -230,13 +298,13 @@ function getLockedSectionsPayload() {
 
 function buildScheduleRequestBody(startIndex, pageSize, includeLockedSections) {
   const requestBody = {
-    courses: [...currentScheduleRequest.courses],
+    courses: [...currentRequest.courses],
     start_index: startIndex,
     page_size: pageSize
   };
 
-  if (currentScheduleRequest.term !== null) {
-    requestBody.term = currentScheduleRequest.term;
+  if (currentRequest.term !== null) {
+    requestBody.term = currentRequest.term;
   }
 
   if (includeLockedSections) {
@@ -253,27 +321,27 @@ function buildScheduleRequestBody(startIndex, pageSize, includeLockedSections) {
 function resetScheduleUiState() {
   hasMoreSchedules = false;
   nextScheduleStartIndex = 0;
-  currentScheduleRequest = null;
-  manipulatedScheduleIndexes = new Set();
-  lockedCourseSections = new Map();
-  setLoadMoreVisible(false);
-  setManipulateVisible(false);
-  setResetManipulatedVisible(false);
+  currentRequest = null;
+  editedIndexes = new Set();
+  lockedSectionsByCourse = new Map();
+  toggleLoadMoreBtn(false);
+  toggleManipulateBtn(false);
+  toggleResetBtn(false);
 }
 
 
 function toggleFavoriteSchedule(index) {
-  if (favoriteScheduleIndexes.has(index)) {
-    favoriteScheduleIndexes.delete(index);
+  if (favoriteIndexes.has(index)) {
+    favoriteIndexes.delete(index);
     return;
   }
 
-  favoriteScheduleIndexes.add(index);
+  favoriteIndexes.add(index);
 }
 
 
 function getTypedClasses() {
-  const typedText = getBox("classRequest").value;
+  const typedText = byId("classRequest").value;
 
   return typedText
     .split(",")
@@ -282,12 +350,12 @@ function getTypedClasses() {
 }
 
 function getTermNumber() {
-  const detailsPanel = getBox("detailsPanel");
-  if (!detailsPanel || detailsPanel.hidden) {
+  const termPanel = byId("termPanel");
+  if (!termPanel || termPanel.hidden) {
     return null;
   }
 
-  const typedTerm = getBox("termInput").value.trim();
+  const typedTerm = byId("termInput").value.trim();
   if (!typedTerm) {
     return null;
   }
@@ -325,13 +393,15 @@ function minutesToClock(totalMinutes) {
 }
 
 function splitClassesByDay(classList) {
-  const dayNames = { M: "Mon", T: "Tue", W: "Wed", R: "Thu", F: "Fri" };
+  const dayNames = { M: "Mon", T: "Tue", W: "Wed", R: "Thu", F: "Fri", S: "Sat", U: "Sun" };
   const classesByDay = {
     Mon: [],
     Tue: [],
     Wed: [],
     Thu: [],
-    Fri: []
+    Fri: [],
+    Sat: [],
+    Sun: []
   };
 
   classList.forEach(classItem => {
@@ -365,7 +435,7 @@ function splitClassesByDay(classList) {
 }
 
 function showChosenClasses(classList) {
-  const box = getBox("selectedSections");
+  const box = byId("selectedSections");
   box.innerHTML = "";
 
   if (!classList.length) {
@@ -377,6 +447,7 @@ function showChosenClasses(classList) {
     const rowBox = document.createElement("div");
     const shouldHighlight = Boolean(classItem.ideal || classItem.is_ideal);
     rowBox.className = `section-item${shouldHighlight ? " ideal" : ""}${isLockedSection(classItem) ? " locked" : ""}`;
+    applyCourseColorStyles(rowBox, classItem, { forSectionRow: true });
     const meetingText = classItem.day === "ONLINE"
       ? "ONLINE"
       : `${classItem.day} ${classItem.start_label} - ${classItem.end_label}`;
@@ -384,49 +455,111 @@ function showChosenClasses(classList) {
     rowBox.title = "Click to lock/unlock this course section for Manipulate";
     rowBox.addEventListener("click", () => {
       toggleLockedSection(classItem);
-      showScheduleButtons();
-      showCurrentSchedule();
+      renderScheduleButtons();
+      renderCurrentSchedule();
     });
     box.appendChild(rowBox);
   });
 }
 
 
-function makeCalendarInfo(classList) {
-  const classesByDay = splitClassesByDay(classList);
-  const allClassTimes = Object.values(classesByDay).flat();
-
-  if (!allClassTimes.length) {
-    return { classesByDay, allClassTimes };
+function parseTimeInputToMinutes(timeText) {
+  if (!timeText || !timeText.includes(":")) {
+    return null;
   }
 
-  const earliestTime = Math.min(...allClassTimes.map(classItem => classItem.start));
-  const latestTime = Math.max(...allClassTimes.map(classItem => classItem.end));
-  const firstHour = Math.max(7, Math.floor(earliestTime / 60));
-  const lastHour = Math.min(22, Math.ceil(latestTime / 60));
-  const pixelsPerMinute = 1.6;
-  const totalHeight = ((lastHour - firstHour) * 60 * pixelsPerMinute) + 80;
+  const [hourText, minuteText] = timeText.split(":");
+  const hours = Number(hourText);
+  const minutes = Number(minuteText);
+
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+    return null;
+  }
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  return (hours * 60) + minutes;
+}
+
+
+function minutesToInputTime(totalMinutes) {
+  const safeMinutes = Math.max(0, Math.min(24 * 60 - 1, totalMinutes));
+  const hour = Math.floor(safeMinutes / 60);
+  const minute = safeMinutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+
+function getVisibleDays() {
+  if (calendarSettings.weekendMode === "both") {
+    return allCalendarDays;
+  }
+
+  if (calendarSettings.weekendMode === "sat") {
+    return [...weekdayCalendarDays, "Sat"];
+  }
+
+  if (calendarSettings.weekendMode === "sun") {
+    return [...weekdayCalendarDays, "Sun"];
+  }
+
+  return weekdayCalendarDays;
+}
+
+
+function buildDevotionalClassItem() {
+  return {
+    course_number: "BYUI Devotional",
+    section_number: "",
+    start: 11 * 60 + 30,
+    end: 12 * 60 + 30,
+    start_label: "11:30 AM",
+    end_label: "12:30 PM",
+    teacher_name: "BYUI Devotional",
+    rmp_score: null,
+    difficulty: null,
+    ideal: null,
+    isDevotional: true
+  };
+}
+
+
+function makeCalendarInfo(classList) {
+  const classesByDay = splitClassesByDay(classList);
+  if (calendarSettings.showDevotional) {
+    classesByDay.Tue.push(buildDevotionalClassItem());
+    classesByDay.Tue.sort((a, b) => a.start - b.start);
+  }
+
+  const allClassTimes = Object.values(classesByDay).flat();
+
+  const firstMinute = calendarSettings.startMinutes;
+  const lastMinute = calendarSettings.endMinutes;
+  const pixelsPerMinute = 1.3;
+  const totalHeight = Math.max(540, ((lastMinute - firstMinute) * pixelsPerMinute) + 20);
 
   return {
     classesByDay,
     allClassTimes,
-    firstHour,
-    lastHour,
+    firstMinute,
+    lastMinute,
     pixelsPerMinute,
     totalHeight
   };
 }
 
 
-function makeTimeSide(firstHour, lastHour, pixelsPerMinute) {
+function makeTimeSide(firstMinute, lastMinute, pixelsPerMinute) {
   const timeBox = document.createElement("div");
   timeBox.className = "calendar-times";
 
-  for (let hour = firstHour; hour <= lastHour; hour += 1) {
+  for (let minuteMark = firstMinute; minuteMark <= lastMinute; minuteMark += 15) {
     const labelBox = document.createElement("div");
     labelBox.className = "calendar-time-label";
-    labelBox.style.top = `${(hour - firstHour) * 60 * pixelsPerMinute}px`;
-    labelBox.textContent = minutesToClock(hour * 60);
+    labelBox.style.top = `${(minuteMark - firstMinute) * pixelsPerMinute}px`;
+    labelBox.textContent = minutesToClock(minuteMark);
     timeBox.appendChild(labelBox);
   }
 
@@ -434,39 +567,115 @@ function makeTimeSide(firstHour, lastHour, pixelsPerMinute) {
 }
 
 
-function addHourLines(trackBox, firstHour, lastHour, pixelsPerMinute) {
-  for (let hour = firstHour; hour < lastHour; hour += 1) {
+function addHourLines(trackBox, firstMinute, lastMinute, pixelsPerMinute) {
+  for (let minuteMark = firstMinute; minuteMark <= lastMinute; minuteMark += 15) {
     const lineBox = document.createElement("div");
-    lineBox.className = "calendar-hour-line";
-    lineBox.style.top = `${(hour - firstHour) * 60 * pixelsPerMinute}px`;
+    lineBox.className = (minuteMark % 60 === 0)
+      ? "calendar-hour-line is-hour"
+      : "calendar-hour-line";
+    lineBox.style.top = `${(minuteMark - firstMinute) * pixelsPerMinute}px`;
     trackBox.appendChild(lineBox);
   }
 }
 
 
-function makeClassCard(classItem, firstHour, pixelsPerMinute) {
+function measureClassCardHeight(cardBox) {
+  const cardStyle = window.getComputedStyle(cardBox);
+  const minimumHeight = parseFloat(cardStyle.minHeight) || 0;
+
+  cardBox.style.height = "auto";
+  const requiredHeight = Math.ceil(cardBox.scrollHeight + 4);
+  return Math.max(minimumHeight, requiredHeight);
+}
+
+
+function formatCourseSectionLabel(courseNumber, sectionNumber) {
+  const courseText = String(courseNumber || "").trim();
+  const sectionText = String(sectionNumber || "").trim();
+
+  if (!courseText) {
+    return sectionText;
+  }
+
+  if (!sectionText) {
+    return courseText;
+  }
+
+  const upperCourse = courseText.toUpperCase();
+  const upperSection = sectionText.toUpperCase();
+  const courseParts = courseText.match(/^([A-Za-z]+)(\d.*)$/);
+
+  if (courseParts) {
+    const subjectPart = courseParts[1].toUpperCase();
+    const numberPart = courseParts[2];
+
+    if (upperSection === String(numberPart).toUpperCase() || upperSection.startsWith(`${String(numberPart).toUpperCase()}-`)) {
+      return `${subjectPart} ${sectionText}`;
+    }
+  }
+
+  if (upperSection.startsWith(`${upperCourse}-`)) {
+    const sectionSuffix = sectionText.slice(courseText.length + 1);
+    if (courseParts) {
+      return `${courseParts[1].toUpperCase()} ${sectionSuffix}`;
+    }
+    return `${courseText}-${sectionSuffix}`;
+  }
+
+  if (upperSection.startsWith(upperCourse)) {
+    let remainder = sectionText.slice(courseText.length);
+    if (remainder.startsWith("-")) {
+      remainder = remainder.slice(1);
+    }
+
+    if (remainder) {
+      if (courseParts) {
+        return `${courseParts[1].toUpperCase()} ${remainder}`;
+      }
+      return `${courseText}-${remainder}`;
+    }
+  }
+
+  if (courseParts) {
+    return `${courseParts[1].toUpperCase()} ${sectionText}`;
+  }
+
+  return `${courseText}-${sectionText}`;
+}
+
+
+function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
   const cardBox = document.createElement("article");
-  const cardTop = (classItem.start - (firstHour * 60)) * pixelsPerMinute;
-  const cardHeight = Math.max(112, (classItem.end - classItem.start) * pixelsPerMinute);
+  const cardTop = (classItem.start - firstMinute) * pixelsPerMinute;
+  const durationHeight = (classItem.end - classItem.start) * pixelsPerMinute;
+  const cardHeight = Math.max(84, durationHeight);
   const shouldHighlight = classItem.ideal || classItem.is_ideal;
   const isLocked = isLockedSection(classItem);
+  const ratingText = classItem.rmp_score ?? "N/A";
+  const difficultyText = classItem.difficulty ?? "N/A";
+  const recommendedText = classItem.ideal === "Y" ? "Yes" : (classItem.ideal === "N" ? "No" : "N/A");
+  const fullTeacherName = classItem.teacher_name || "Teacher";
+  const displayCourseSection = classItem.isDevotional
+    ? "BYUI Devotional"
+    : formatCourseSectionLabel(classItem.course_number, classItem.section_number);
+  const teacherHoverText = `RateMyProfessor\nRating: ${ratingText}\nDifficulty: ${difficultyText}\nRecommended: ${recommendedText}`;
 
-  cardBox.className = `calendar-class-card${shouldHighlight ? " ideal" : ""}${isLocked ? " locked" : ""}`;
+  cardBox.className = `calendar-class-card${shouldHighlight ? " ideal" : ""}${isLocked ? " locked" : ""}${classItem.isDevotional ? " devotional" : ""}`;
   cardBox.style.top = `${cardTop}px`;
   cardBox.style.height = `${cardHeight}px`;
+  applyCourseColorStyles(cardBox, classItem);
   cardBox.title = "Click to lock/unlock this course section for Manipulate";
   cardBox.innerHTML = `
-    <strong>${classItem.course_number}</strong>
-    <span>Section ${classItem.section_number}</span>
+    <strong>${displayCourseSection}</strong>
     <span>${classItem.start_label} - ${classItem.end_label}</span>
-    <small>${classItem.teacher_name}</small>
+    <small class="teacher-hover-info" title="${teacherHoverText}\nTeacher: ${fullTeacherName}">${fullTeacherName}</small>
   `;
 
   return cardBox;
 }
 
 
-function makeDayColumn(dayName, classesByDay, totalHeight, firstHour, lastHour, pixelsPerMinute) {
+function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinute, pixelsPerMinute) {
   const dayBox = document.createElement("section");
   dayBox.className = "calendar-day";
 
@@ -479,22 +688,26 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstHour, lastHour, 
   trackBox.className = "calendar-day-track";
   trackBox.style.height = `${totalHeight}px`;
 
-  addHourLines(trackBox, firstHour, lastHour, pixelsPerMinute);
+  addHourLines(trackBox, firstMinute, lastMinute, pixelsPerMinute);
 
   classesByDay[dayName].forEach(classItem => {
-    const classCard = makeClassCard(classItem, firstHour, pixelsPerMinute);
+    if (classItem.end <= firstMinute || classItem.start >= lastMinute) {
+      return;
+    }
+
+    const visibleClass = {
+      ...classItem,
+      start: Math.max(classItem.start, firstMinute),
+      end: Math.min(classItem.end, lastMinute)
+    };
+
+    const classCard = makeClassCard(visibleClass, firstMinute, pixelsPerMinute);
     classCard.addEventListener("click", () => {
       toggleLockedSection(classItem);
-      showScheduleButtons();
-      showCurrentSchedule();
+      renderScheduleButtons();
+      renderCurrentSchedule();
     });
     trackBox.appendChild(classCard);
-
-    const currentHeight = parseFloat(classCard.style.height) || 0;
-    const neededHeight = classCard.scrollHeight + 6;
-    if (neededHeight > currentHeight) {
-      classCard.style.height = `${neededHeight}px`;
-    }
   });
 
   dayBox.appendChild(trackBox);
@@ -502,35 +715,137 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstHour, lastHour, 
 }
 
 function showCalendar(classList) {
-  const box = getBox("scheduleGrid");
+  const box = byId("scheduleGrid");
   box.innerHTML = "";
 
   const calendarActions = document.createElement("div");
   calendarActions.className = "calendar-actions";
 
+  const optionsButton = document.createElement("button");
+  optionsButton.type = "button";
+  optionsButton.className = `btn-main btn-options calendar-options-btn${calendarOptionsOpen ? " active" : ""}`;
+  optionsButton.textContent = "Options";
+  optionsButton.addEventListener("click", () => {
+    calendarOptionsOpen = !calendarOptionsOpen;
+    renderCurrentSchedule();
+  });
+
   const favoriteButton = document.createElement("button");
   favoriteButton.type = "button";
-  const isFavorite = isFavoriteSchedule(chosenScheduleIndex);
-  favoriteButton.className = `calendar-favorite-btn${isFavorite ? " active" : ""}`;
+  const isFavorite = isFavoriteSchedule(currentScheduleIndex);
+  favoriteButton.className = `btn-main btn-star calendar-favorite-btn${isFavorite ? " active" : ""}`;
   favoriteButton.textContent = isFavorite ? "★" : "☆";
   favoriteButton.title = isFavorite
     ? "Unhighlight this schedule option"
     : "Highlight this schedule option";
   favoriteButton.addEventListener("click", () => {
-    toggleFavoriteSchedule(chosenScheduleIndex);
-    showScheduleButtons();
-    showCurrentSchedule();
+    toggleFavoriteSchedule(currentScheduleIndex);
+    renderScheduleButtons();
+    renderCurrentSchedule();
   });
 
+  calendarActions.appendChild(optionsButton);
   calendarActions.appendChild(favoriteButton);
   box.appendChild(calendarActions);
+
+  if (calendarOptionsOpen) {
+    const optionsPanel = document.createElement("section");
+    optionsPanel.className = "calendar-options-panel settings-row";
+
+    const isSatOnly = calendarSettings.weekendMode === "sat";
+    const isSunOnly = calendarSettings.weekendMode === "sun";
+    const isBothWeekendDays = calendarSettings.weekendMode === "both";
+    const shouldShowSat = isSatOnly || isBothWeekendDays;
+    const shouldShowSun = isSunOnly || isBothWeekendDays;
+
+    optionsPanel.innerHTML = `
+      <label class="calendar-options-field calendar-options-start-field">
+        <span>Start Time</span>
+        <input id="calendarStartTime" type="time" step="900" value="${minutesToInputTime(calendarSettings.startMinutes)}" />
+      </label>
+      <label class="calendar-options-field calendar-options-end-field">
+        <span>End Time</span>
+        <input id="calendarEndTime" type="time" step="900" value="${minutesToInputTime(calendarSettings.endMinutes)}" />
+      </label>
+      <div class="calendar-options-weekends calendar-options-weekends-field days-group">
+        <label class="calendar-options-check check-option">
+          <input id="calendarShowSat" type="checkbox" ${shouldShowSat ? "checked" : ""} /> Sat
+        </label>
+        <label class="calendar-options-check check-option">
+          <input id="calendarShowSun" type="checkbox" ${shouldShowSun ? "checked" : ""} /> Sun
+        </label>
+        <label class="calendar-options-check calendar-options-devotional check-option devotional-label">
+          <input id="calendarShowDevotional" type="checkbox" ${calendarSettings.showDevotional ? "checked" : ""} /> Devotional
+        </label>
+      </div>
+    `;
+
+    box.appendChild(optionsPanel);
+
+    const satCheckbox = optionsPanel.querySelector("#calendarShowSat");
+    const sunCheckbox = optionsPanel.querySelector("#calendarShowSun");
+    const startInput = optionsPanel.querySelector("#calendarStartTime");
+    const endInput = optionsPanel.querySelector("#calendarEndTime");
+    const devotionalInput = optionsPanel.querySelector("#calendarShowDevotional");
+
+    function applyCalendarOptions(showValidationError) {
+      const startMinutes = parseTimeInputToMinutes(startInput.value);
+      const endMinutes = parseTimeInputToMinutes(endInput.value);
+
+      if (startMinutes === null || endMinutes === null) {
+        if (showValidationError) {
+          byId("requestMessage").textContent = "Please enter valid start/end times.";
+        }
+        return;
+      }
+
+      if (endMinutes <= startMinutes) {
+        if (showValidationError) {
+          byId("requestMessage").textContent = "End time must be after start time.";
+        }
+        return;
+      }
+
+      if ((endMinutes - startMinutes) < 60) {
+        if (showValidationError) {
+          byId("requestMessage").textContent = "Please select at least a 1-hour calendar window.";
+        }
+        return;
+      }
+
+      let weekendMode = "none";
+      if (satCheckbox.checked && sunCheckbox.checked) {
+        weekendMode = "both";
+      } else if (satCheckbox.checked) {
+        weekendMode = "sat";
+      } else if (sunCheckbox.checked) {
+        weekendMode = "sun";
+      }
+
+      calendarSettings = {
+        startMinutes,
+        endMinutes,
+        weekendMode,
+        showDevotional: Boolean(devotionalInput && devotionalInput.checked)
+      };
+
+      byId("requestMessage").textContent = "";
+      renderCurrentSchedule();
+    }
+
+    satCheckbox.addEventListener("change", () => applyCalendarOptions(false));
+    sunCheckbox.addEventListener("change", () => applyCalendarOptions(false));
+    devotionalInput.addEventListener("change", () => applyCalendarOptions(false));
+    startInput.addEventListener("change", () => applyCalendarOptions(true));
+    endInput.addEventListener("change", () => applyCalendarOptions(true));
+  }
 
   const calendarInfo = makeCalendarInfo(classList);
   const {
     classesByDay,
     allClassTimes,
-    firstHour,
-    lastHour,
+    firstMinute,
+    lastMinute,
     pixelsPerMinute,
     totalHeight
   } = calendarInfo;
@@ -545,14 +860,16 @@ function showCalendar(classList) {
   const calendarBox = document.createElement("div");
   calendarBox.className = "calendar-board";
 
-  calendarBox.appendChild(makeTimeSide(firstHour, lastHour, pixelsPerMinute));
+  calendarBox.appendChild(makeTimeSide(firstMinute, lastMinute, pixelsPerMinute));
 
   const dayBoxes = document.createElement("div");
   dayBoxes.className = "calendar-days";
 
-  weekDays.forEach(dayName => {
+  const visibleDays = getVisibleDays();
+  dayBoxes.style.setProperty("--calendar-columns", String(visibleDays.length));
+  visibleDays.forEach(dayName => {
     dayBoxes.appendChild(
-      makeDayColumn(dayName, classesByDay, totalHeight, firstHour, lastHour, pixelsPerMinute)
+      makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinute, pixelsPerMinute)
     );
   });
 
@@ -561,28 +878,37 @@ function showCalendar(classList) {
 }
 
 
-function showCurrentSchedule() {
-  const classList = scheduleChoices[chosenScheduleIndex] || [];
+function renderCurrentSchedule() {
+  const classList = schedules[currentScheduleIndex] || [];
   showChosenClasses(classList);
   showCalendar(classList);
 }
 
-function showScheduleButtons() {
-  const box = getBox("scheduleOptions");
-  box.innerHTML = "";
 
-  if (!scheduleChoices.length) {
-    box.textContent = "No potential schedules available.";
-    setLoadMoreVisible(false);
-    setManipulateVisible(false);
-    setResetManipulatedVisible(false);
+function rerenderOnResize() {
+  if (!schedules.length) {
     return;
   }
 
-  scheduleChoices.forEach((_, buttonIndex) => {
+  renderCurrentSchedule();
+}
+
+function renderScheduleButtons() {
+  const box = byId("scheduleOptions");
+  box.innerHTML = "";
+
+  if (!schedules.length) {
+    box.textContent = "No potential schedules available.";
+    toggleLoadMoreBtn(false);
+    toggleManipulateBtn(false);
+    toggleResetBtn(false);
+    return;
+  }
+
+  schedules.forEach((_, buttonIndex) => {
     const optionButton = document.createElement("button");
     optionButton.type = "button";
-    optionButton.className = `schedule-option-btn${buttonIndex === chosenScheduleIndex ? " active" : ""}${isFavoriteSchedule(buttonIndex) ? " favorite" : ""}${manipulatedScheduleIndexes.has(buttonIndex) ? " manipulated" : ""}`;
+    optionButton.className = `btn-main btn-schedule-option schedule-option-btn${buttonIndex === currentScheduleIndex ? " active" : ""}${isFavoriteSchedule(buttonIndex) ? " favorite" : ""}${editedIndexes.has(buttonIndex) ? " manipulated" : ""}`;
 
     let labelText = `Option ${buttonIndex + 1}`;
     if (isFavoriteSchedule(buttonIndex)) {
@@ -591,17 +917,17 @@ function showScheduleButtons() {
     optionButton.textContent = labelText;
 
     optionButton.addEventListener("click", () => {
-      chosenScheduleIndex = buttonIndex;
-      showScheduleButtons();
-      showCurrentSchedule();
+      currentScheduleIndex = buttonIndex;
+      renderScheduleButtons();
+      renderCurrentSchedule();
     });
     box.appendChild(optionButton);
   });
 
-  setLoadMoreVisible(hasMoreSchedules);
-  const shouldShowManipulateTools = scheduleChoices.length > 0 && lockedCourseSections.size > 0;
-  setManipulateVisible(shouldShowManipulateTools);
-  setResetManipulatedVisible(shouldShowManipulateTools);
+  toggleLoadMoreBtn(hasMoreSchedules);
+  const shouldShowManipulateTools = schedules.length > 0 && lockedSectionsByCourse.size > 0;
+  toggleManipulateBtn(shouldShowManipulateTools);
+  toggleResetBtn(shouldShowManipulateTools);
 }
 
 
@@ -616,22 +942,22 @@ async function readScheduleData(serverResponse) {
 }
 
 
-function showErrorMessage(message) {
-  getBox("requestMessage").textContent = message;
-  clearScheduleBoxes();
+function showScheduleError(message) {
+  byId("requestMessage").textContent = message;
+  clearScheduleUi();
   resetScheduleUiState();
 }
 
 
-function clearTeacherResults() {
-  getBox("teacherMessage").textContent = "";
-  getBox("teacherResults").innerHTML = "";
+function clearTeacherUi() {
+  byId("teacherMessage").textContent = "";
+  byId("teacherResults").innerHTML = "";
 }
 
 
-function showTeacherResults(teacherList) {
-  const messageBox = getBox("teacherMessage");
-  const resultsBox = getBox("teacherResults");
+function renderTeacherResults(teacherList) {
+  const messageBox = byId("teacherMessage");
+  const resultsBox = byId("teacherResults");
   resultsBox.innerHTML = "";
 
   if (!teacherList.length) {
@@ -669,68 +995,68 @@ function showTeacherResults(teacherList) {
 }
 
 
-function showSchedulesFromServer(serverData, appendMode, preserveLockedSections) {
+function applyServerSchedules(serverData, appendMode, preserveLockedSections) {
   const loadedSchedules = serverData.valid_schedules || [];
 
   if (appendMode) {
-    scheduleChoices = scheduleChoices.concat(loadedSchedules);
+    schedules = schedules.concat(loadedSchedules);
   } else {
-    scheduleChoices = loadedSchedules;
-    chosenScheduleIndex = 0;
-    favoriteScheduleIndexes = new Set();
-    manipulatedScheduleIndexes = new Set();
+    schedules = loadedSchedules;
+    currentScheduleIndex = 0;
+    favoriteIndexes = new Set();
+    editedIndexes = new Set();
     if (!preserveLockedSections) {
-      lockedCourseSections = new Map();
+      lockedSectionsByCourse = new Map();
     }
   }
 
   hasMoreSchedules = Boolean(serverData.has_more);
   nextScheduleStartIndex = Number.isInteger(serverData.next_start_index)
     ? serverData.next_start_index
-    : scheduleChoices.length;
+    : schedules.length;
 
-  if (!scheduleChoices.length) {
-    getBox("requestMessage").textContent = "No conflict-free schedule found.";
-    showScheduleButtons();
-    showCurrentSchedule();
+  if (!schedules.length) {
+    byId("requestMessage").textContent = "No conflict-free schedule found.";
+    renderScheduleButtons();
+    renderCurrentSchedule();
     return;
   }
 
   if (appendMode) {
-    getBox("requestMessage").textContent = loadedSchedules.length
-      ? `Loaded ${loadedSchedules.length} more schedule(s). Showing ${scheduleChoices.length} total.`
-      : `No additional schedules found. Showing ${scheduleChoices.length} total.`;
+    byId("requestMessage").textContent = loadedSchedules.length
+      ? `Loaded ${loadedSchedules.length} more schedule(s). Showing ${schedules.length} total.`
+      : `No additional schedules found. Showing ${schedules.length} total.`;
   } else {
-    getBox("requestMessage").textContent = `Showing ${scheduleChoices.length} potential schedule(s).`;
+    byId("requestMessage").textContent = `Showing ${schedules.length} potential schedule(s).`;
   }
 
-  showScheduleButtons();
-  showCurrentSchedule();
+  renderScheduleButtons();
+  renderCurrentSchedule();
 }
 
-async function submitClassCodes() {
+async function runScheduleSearch() {
   const typedClasses = getTypedClasses();
   const chosenTerm = getTermNumber();
 
   if (typedClasses.length === 0) {
-    setResultsPanelVisible(false);
-    showErrorMessage("Please enter at least one class code.");
+    toggleResultsPanel(false);
+    showScheduleError("Please enter at least one class code.");
     return;
   }
 
   if (Number.isNaN(chosenTerm)) {
-    setResultsPanelVisible(false);
-    showErrorMessage("Term number must be a positive whole number.");
+    toggleResultsPanel(false);
+    showScheduleError("Term number must be a positive whole number.");
     return;
   }
 
-  setResultsPanelVisible(true);
-  getBox("requestMessage").textContent = "Loading schedules...";
-  clearScheduleBoxes();
+  toggleResultsPanel(true);
+  byId("requestMessage").textContent = "Loading schedules...";
+  clearScheduleUi();
   resetScheduleUiState();
 
   try {
-    currentScheduleRequest = {
+    currentRequest = {
       courses: [...typedClasses],
       term: chosenTerm
     };
@@ -741,27 +1067,27 @@ async function submitClassCodes() {
     const serverData = await readScheduleData(response);
 
     if (!response.ok) {
-      showErrorMessage(serverData.error || "Request failed.");
+      showScheduleError(serverData.error || "Request failed.");
       return;
     }
 
-    showSchedulesFromServer(serverData, false, false);
+    applyServerSchedules(serverData, false, false);
   } catch (error) {
-    getBox("requestMessage").textContent = "Could not reach the scheduler API.";
-    getBox("scheduleOptions").textContent = "";
-    getBox("selectedSections").textContent = "";
-    getBox("scheduleGrid").textContent = `Details: ${error.message}`;
+    byId("requestMessage").textContent = "Could not reach the scheduler API.";
+    byId("scheduleOptions").textContent = "";
+    byId("selectedSections").textContent = "";
+    byId("scheduleGrid").textContent = `Details: ${error.message}`;
     resetScheduleUiState();
   }
 }
 
 
-async function loadMoreSchedules() {
-  if (!currentScheduleRequest || !hasMoreSchedules) {
+async function runLoadMoreSchedules() {
+  if (!currentRequest || !hasMoreSchedules) {
     return;
   }
 
-  const loadMoreButton = getBox("loadMoreBtn");
+  const loadMoreButton = byId("loadMoreBtn");
   loadMoreButton.disabled = true;
   loadMoreButton.textContent = "Loading...";
 
@@ -772,13 +1098,13 @@ async function loadMoreSchedules() {
     const serverData = await readScheduleData(response);
 
     if (!response.ok) {
-      getBox("requestMessage").textContent = serverData.error || "Could not load more schedules.";
+      byId("requestMessage").textContent = serverData.error || "Could not load more schedules.";
       return;
     }
 
-    showSchedulesFromServer(serverData, true, true);
+    applyServerSchedules(serverData, true, true);
   } catch (error) {
-    getBox("requestMessage").textContent = `Could not load more schedules. Details: ${error.message}`;
+    byId("requestMessage").textContent = `Could not load more schedules. Details: ${error.message}`;
   } finally {
     loadMoreButton.disabled = false;
     loadMoreButton.textContent = "Load More";
@@ -786,22 +1112,22 @@ async function loadMoreSchedules() {
 }
 
 
-async function manipulateSchedules() {
-  if (!currentScheduleRequest || !scheduleChoices.length) {
+async function runManipulateSchedules() {
+  if (!currentRequest || !schedules.length) {
     return;
   }
 
   const lockedSections = getLockedSectionsPayload();
   if (!lockedSections.length) {
-    getBox("requestMessage").textContent = "Click a course first to lock it before using Manipulate.";
+    byId("requestMessage").textContent = "Click a course first to lock it before using Manipulate.";
     return;
   }
 
-  const manipulateButton = getBox("manipulateBtn");
+  const manipulateButton = byId("manipulateBtn");
   manipulateButton.disabled = true;
 
   try {
-    const knownSignatures = new Set(scheduleChoices.map(makeScheduleSignature));
+    const knownSignatures = new Set(schedules.map(makeScheduleSignature));
     const appendedSchedules = [];
     let startIndex = 0;
     let keepLoading = true;
@@ -815,7 +1141,7 @@ async function manipulateSchedules() {
       const serverData = await readScheduleData(response);
 
       if (!response.ok) {
-        getBox("requestMessage").textContent = serverData.error || "Could not manipulate schedules.";
+        byId("requestMessage").textContent = serverData.error || "Could not manipulate schedules.";
         return;
       }
 
@@ -839,39 +1165,39 @@ async function manipulateSchedules() {
     }
 
     if (!appendedSchedules.length) {
-      getBox("requestMessage").textContent = "No additional schedule options found for the selected locked course(s).";
+      byId("requestMessage").textContent = "No additional schedule options found for the selected locked course(s).";
       return;
     }
 
-    const previousLength = scheduleChoices.length;
-    scheduleChoices = scheduleChoices.concat(appendedSchedules);
-    for (let i = previousLength; i < scheduleChoices.length; i += 1) {
-      manipulatedScheduleIndexes.add(i);
+    const previousLength = schedules.length;
+    schedules = schedules.concat(appendedSchedules);
+    for (let i = previousLength; i < schedules.length; i += 1) {
+      editedIndexes.add(i);
     }
 
     hasMoreSchedules = latestHasMore;
     nextScheduleStartIndex = startIndex;
-    showScheduleButtons();
-    showCurrentSchedule();
-    getBox("requestMessage").textContent = `Locked ${lockedSections.length} course(s). Added ${appendedSchedules.length} new option(s).`;
+    renderScheduleButtons();
+    renderCurrentSchedule();
+    byId("requestMessage").textContent = `Locked ${lockedSections.length} course(s). Added ${appendedSchedules.length} new option(s).`;
   } catch (error) {
-    getBox("requestMessage").textContent = `Could not manipulate schedules. Details: ${error.message}`;
+    byId("requestMessage").textContent = `Could not manipulate schedules. Details: ${error.message}`;
   } finally {
     manipulateButton.disabled = false;
   }
 }
 
 
-function resetManipulatedSchedules() {
-  if (!manipulatedScheduleIndexes.size) {
-    getBox("requestMessage").textContent = "No manipulated schedules to reset.";
+function runResetManipulatedSchedules() {
+  if (!editedIndexes.size) {
+    byId("requestMessage").textContent = "No manipulated schedules to reset.";
     return;
   }
 
   const keptOldIndexes = [];
-  scheduleChoices.forEach((_, index) => {
-    const isManipulated = manipulatedScheduleIndexes.has(index);
-    const isStarred = favoriteScheduleIndexes.has(index);
+  schedules.forEach((_, index) => {
+    const isManipulated = editedIndexes.has(index);
+    const isStarred = favoriteIndexes.has(index);
     if (!isManipulated || isStarred) {
       keptOldIndexes.push(index);
     }
@@ -882,56 +1208,56 @@ function resetManipulatedSchedules() {
     oldToNewIndex.set(oldIndex, newIndex);
   });
 
-  const removedCount = scheduleChoices.length - keptOldIndexes.length;
+  const removedCount = schedules.length - keptOldIndexes.length;
   if (removedCount <= 0) {
-    getBox("requestMessage").textContent = "All manipulated schedules are saved with stars, so none were removed.";
+    byId("requestMessage").textContent = "All manipulated schedules are saved with stars, so none were removed.";
     return;
   }
 
-  scheduleChoices = keptOldIndexes.map(oldIndex => scheduleChoices[oldIndex]);
+  schedules = keptOldIndexes.map(oldIndex => schedules[oldIndex]);
 
   const nextFavorites = new Set();
-  favoriteScheduleIndexes.forEach(oldIndex => {
+  favoriteIndexes.forEach(oldIndex => {
     if (oldToNewIndex.has(oldIndex)) {
       nextFavorites.add(oldToNewIndex.get(oldIndex));
     }
   });
-  favoriteScheduleIndexes = nextFavorites;
+  favoriteIndexes = nextFavorites;
 
   const nextManipulated = new Set();
-  manipulatedScheduleIndexes.forEach(oldIndex => {
+  editedIndexes.forEach(oldIndex => {
     if (oldToNewIndex.has(oldIndex)) {
       nextManipulated.add(oldToNewIndex.get(oldIndex));
     }
   });
-  manipulatedScheduleIndexes = nextManipulated;
+  editedIndexes = nextManipulated;
 
-  if (!scheduleChoices.length) {
-    chosenScheduleIndex = 0;
-  } else if (!oldToNewIndex.has(chosenScheduleIndex)) {
-    chosenScheduleIndex = 0;
+  if (!schedules.length) {
+    currentScheduleIndex = 0;
+  } else if (!oldToNewIndex.has(currentScheduleIndex)) {
+    currentScheduleIndex = 0;
   } else {
-    chosenScheduleIndex = oldToNewIndex.get(chosenScheduleIndex);
+    currentScheduleIndex = oldToNewIndex.get(currentScheduleIndex);
   }
 
-  showScheduleButtons();
-  showCurrentSchedule();
-  getBox("requestMessage").textContent = `Removed ${removedCount} manipulated schedule option(s). Starred ones were kept.`;
+  renderScheduleButtons();
+  renderCurrentSchedule();
+  byId("requestMessage").textContent = `Removed ${removedCount} manipulated schedule option(s). Starred ones were kept.`;
 }
 
 
-async function submitTeacherSearch() {
-  const typedTeacher = getBox("teacherRequest").value.trim();
+async function runTeacherSearch() {
+  const typedTeacher = byId("teacherRequest").value.trim();
   const chosenTerm = getTermNumber();
 
   if (Number.isNaN(chosenTerm)) {
-    clearTeacherResults();
-    getBox("teacherMessage").textContent = "Term number must be a positive whole number.";
+    clearTeacherUi();
+    byId("teacherMessage").textContent = "Term number must be a positive whole number.";
     return;
   }
 
-  getBox("teacherMessage").textContent = "Loading teachers...";
-  getBox("teacherResults").innerHTML = "";
+  byId("teacherMessage").textContent = "Loading teachers...";
+  byId("teacherResults").innerHTML = "";
 
   try {
     const requestBody = { query: typedTeacher };
@@ -943,83 +1269,83 @@ async function submitTeacherSearch() {
     const serverData = await readScheduleData(response);
 
     if (!response.ok) {
-      clearTeacherResults();
-      getBox("teacherMessage").textContent = serverData.error || "Teacher search failed.";
+      clearTeacherUi();
+      byId("teacherMessage").textContent = serverData.error || "Teacher search failed.";
       return;
     }
 
-    showTeacherResults(serverData.teachers || []);
+    renderTeacherResults(serverData.teachers || []);
   } catch (error) {
-    clearTeacherResults();
-    getBox("teacherMessage").textContent = `Could not reach the scheduler API. Details: ${error.message}`;
+    clearTeacherUi();
+    byId("teacherMessage").textContent = `Could not reach the scheduler API. Details: ${error.message}`;
   }
 }
 
 
-getBox("detailsBtn").addEventListener("click", () => {
-  const panelBox = getBox("detailsPanel");
+byId("termBtn").addEventListener("click", () => {
+  const panelBox = byId("termPanel");
   const shouldShow = panelBox ? panelBox.hidden : false;
-  setDetailsPanelVisible(shouldShow);
+  toggleTermPanel(shouldShow);
 
   if (shouldShow) {
-    getBox("termInput").focus();
+    byId("termInput").focus();
   } else {
-    getBox("termInput").value = "";
-    setTeacherPanelVisible(false);
-    clearTeacherResults();
+    byId("termInput").value = "";
   }
 });
 
-getBox("generateBtn").addEventListener("click", submitClassCodes);
-getBox("loadMoreBtn").addEventListener("click", loadMoreSchedules);
-getBox("manipulateBtn").addEventListener("click", manipulateSchedules);
-getBox("resetManipulatedBtn").addEventListener("click", resetManipulatedSchedules);
-getBox("teacherBtn").addEventListener("click", () => {
-  const detailsPanel = getBox("detailsPanel");
-  if (detailsPanel && detailsPanel.hidden) {
-    setDetailsPanelVisible(true);
-    setTeacherPanelVisible(true);
-    getBox("teacherRequest").focus();
-    return;
-  }
-
-  const panelBox = getBox("teacherSearchPanel");
+byId("generateBtn").addEventListener("click", runScheduleSearch);
+byId("loadMoreBtn").addEventListener("click", runLoadMoreSchedules);
+byId("manipulateBtn").addEventListener("click", runManipulateSchedules);
+byId("resetManipulatedBtn").addEventListener("click", runResetManipulatedSchedules);
+byId("teacherBtn").addEventListener("click", () => {
+  const panelBox = byId("teacherSearchPanel");
   const shouldShow = panelBox ? panelBox.hidden : false;
-  setTeacherPanelVisible(shouldShow);
+  toggleTeacherPanel(shouldShow);
 
   if (shouldShow) {
-    getBox("teacherRequest").focus();
+    byId("teacherRequest").focus();
   }
 });
-getBox("teacherSearchBtn").addEventListener("click", submitTeacherSearch);
-getBox("teacherClearBtn").addEventListener("click", () => {
-  getBox("teacherRequest").value = "";
-  clearTeacherResults();
-  getBox("teacherRequest").focus();
+byId("teacherSearchBtn").addEventListener("click", runTeacherSearch);
+byId("teacherClearBtn").addEventListener("click", () => {
+  byId("teacherRequest").value = "";
+  clearTeacherUi();
+  byId("teacherRequest").focus();
 });
-getBox("classClearBtn").addEventListener("click", () => {
-  getBox("classRequest").value = "";
-  getBox("termInput").value = "";
-  getBox("requestMessage").textContent = "";
+byId("classClearBtn").addEventListener("click", () => {
+  byId("classRequest").value = "";
+  byId("termInput").value = "";
+  byId("requestMessage").textContent = "";
   resetScheduleUiState();
-  clearScheduleBoxes();
-  setResultsPanelVisible(false);
-  getBox("classRequest").focus();
+  clearScheduleUi();
+  toggleResultsPanel(false);
+  byId("classRequest").focus();
 });
-getBox("classRequest").addEventListener("keydown", event => {
+byId("classRequest").addEventListener("keydown", event => {
   if (event.key === "Enter") {
-    submitClassCodes();
+    runScheduleSearch();
   }
 });
-getBox("teacherRequest").addEventListener("keydown", event => {
+byId("teacherRequest").addEventListener("keydown", event => {
   if (event.key === "Enter") {
-    submitTeacherSearch();
+    runTeacherSearch();
   }
 });
 
-setResultsPanelVisible(false);
-setTeacherPanelVisible(false);
-setDetailsPanelVisible(false);
-setLoadMoreVisible(false);
-setManipulateVisible(false);
-setResetManipulatedVisible(false);
+toggleResultsPanel(false);
+toggleTeacherPanel(false);
+toggleTermPanel(false);
+toggleLoadMoreBtn(false);
+toggleManipulateBtn(false);
+toggleResetBtn(false);
+
+window.addEventListener("resize", () => {
+  if (calendarResizeTimer !== null) {
+    window.clearTimeout(calendarResizeTimer);
+  }
+
+  calendarResizeTimer = window.setTimeout(() => {
+    rerenderOnResize();
+  }, 120);
+});

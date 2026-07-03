@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import pandas as pd
 from itertools import product
 import re
+from pathlib import Path
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
@@ -10,10 +11,13 @@ MAX_CLASSES_PER_SEARCH = 8
 MAX_SCHEDULE_CHECKS = 50000
 MAX_SCHEDULE_RESULTS = 5
 MAX_SCHEDULE_PAGE_SIZE = 25
+MINUTES_BETWEEN_CLASSES = 15
 
-sections = pd.read_csv("section.csv")
-courses = pd.read_csv("course.csv")
-teachers = pd.read_csv("teacher.csv")
+BASE_DIR = Path(__file__).resolve().parent
+
+sections = pd.read_csv(BASE_DIR / "section.csv")
+courses = pd.read_csv(BASE_DIR / "course.csv")
+teachers = pd.read_csv(BASE_DIR / "teacher.csv")
 
 sections.columns = sections.columns.str.strip()
 courses.columns = courses.columns.str.strip()
@@ -29,13 +33,13 @@ for course_number in courses['course_number']:
         class_codes.append(upper_code)
 
 
-def normalize_code(code_text):
+def normalize_course_code(code_text):
     return re.sub(r"[^A-Z0-9]", "", str(code_text).upper())
 
 
 normalized_code_map = {}
 for saved_code in class_codes:
-    normalized = normalize_code(saved_code)
+    normalized = normalize_course_code(saved_code)
     if normalized not in normalized_code_map:
         normalized_code_map[normalized] = []
     normalized_code_map[normalized].append(saved_code)
@@ -72,12 +76,12 @@ def get_json_body(default_empty=False):
     return body
 
 
-def time_to_minutes(time_text):
+def to_minutes(time_text):
     parts = str(time_text).split(':')
     return int(parts[0]) * 60 + int(parts[1])
 
 
-def make_time_label(time_text):
+def to_time_label(time_text):
     if pd.isna(time_text):
         return None
 
@@ -96,13 +100,13 @@ def make_time_label(time_text):
     return str(hour) + ":" + str(minute).zfill(2) + " " + period
 
 
-def clean_value(value):
+def clean_cell(value):
     if pd.isna(value):
         return None
     return value
 
 
-def times_overlap(first_day, first_start, first_end, second_day, second_start, second_end):
+def classes_conflict(first_day, first_start, first_end, second_day, second_start, second_end):
     if pd.isna(first_day) or pd.isna(second_day):
         return False
 
@@ -124,21 +128,25 @@ def times_overlap(first_day, first_start, first_end, second_day, second_start, s
     if not same_day_found:
         return False
 
-    first_class_start = time_to_minutes(first_start)
-    first_class_end = time_to_minutes(first_end)
-    second_class_start = time_to_minutes(second_start)
-    second_class_end = time_to_minutes(second_end)
+    first_class_start = to_minutes(first_start)
+    first_class_end = to_minutes(first_end)
+    second_class_start = to_minutes(second_start)
+    second_class_end = to_minutes(second_end)
 
-    classes_do_not_overlap = (first_class_end <= second_class_start) or (second_class_end <= first_class_start)
+    classes_do_not_overlap = (
+        (first_class_end + MINUTES_BETWEEN_CLASSES <= second_class_start)
+        or
+        (second_class_end + MINUTES_BETWEEN_CLASSES <= first_class_start)
+    )
     return not classes_do_not_overlap
 
 
-def has_conflict(schedule_list):
+def schedule_has_conflict(schedule_list):
     for i in range(len(schedule_list)):
         for j in range(i+1, len(schedule_list)):
             first_class = schedule_list[i]
             second_class = schedule_list[j]
-            if times_overlap(
+            if classes_conflict(
                 first_class['day'], first_class['start_time'], first_class['end_time'],
                 second_class['day'], second_class['start_time'], second_class['end_time']
             ):
@@ -146,29 +154,32 @@ def has_conflict(schedule_list):
     return False
 
 
-def clean_section(section):
+def to_section_json(section):
     return {
-        "course_number": clean_value(section["course_number"]),
-        "course_name": clean_value(section["course_name"]),
-        "section_number": clean_value(section["section_number"]),
-        "day": clean_value(section["day"]),
-        "start_time": clean_value(section["start_time"]),
-        "end_time": clean_value(section["end_time"]),
-        "start_label": make_time_label(section["start_time"]),
-        "end_label": make_time_label(section["end_time"]),
-        "teacher_name": clean_value(section["teacher_name"])
+        "course_number": clean_cell(section["course_number"]),
+        "course_name": clean_cell(section["course_name"]),
+        "section_number": clean_cell(section["section_number"]),
+        "day": clean_cell(section["day"]),
+        "start_time": clean_cell(section["start_time"]),
+        "end_time": clean_cell(section["end_time"]),
+        "start_label": to_time_label(section["start_time"]),
+        "end_label": to_time_label(section["end_time"]),
+        "teacher_name": clean_cell(section["teacher_name"]),
+        "rmp_score": clean_cell(section["rmp_score"]),
+        "difficulty": clean_cell(section["difficulty"]),
+        "ideal": clean_cell(section["ideal"])
     }
 
 
-def clean_course(course):
+def to_course_json(course):
     return {
-        "course_number": clean_value(course["course_number"]),
-        "course_name": clean_value(course["course_name"]),
-        "credits": clean_value(course["credits"])
+        "course_number": clean_cell(course["course_number"]),
+        "course_name": clean_cell(course["course_name"]),
+        "credits": clean_cell(course["credits"])
     }
 
 
-def get_term_number(raw_term):
+def parse_term_number(raw_term):
     if raw_term is None or raw_term == "":
         return None, None
 
@@ -178,7 +189,7 @@ def get_term_number(raw_term):
         return None, "'term' must be a whole number."
 
 
-def get_paging_values(raw_start_index, raw_page_size):
+def parse_paging_values(raw_start_index, raw_page_size):
     try:
         start_index = int(raw_start_index if raw_start_index is not None else 0)
     except (TypeError, ValueError):
@@ -201,7 +212,7 @@ def get_paging_values(raw_start_index, raw_page_size):
     return start_index, page_size, None
 
 
-def get_locked_sections_map(raw_locked_sections):
+def parse_locked_sections(raw_locked_sections):
     if raw_locked_sections is None:
         return {}, None
 
@@ -223,7 +234,7 @@ def get_locked_sections_map(raw_locked_sections):
         if not isinstance(raw_section_code, str) or not raw_section_code.strip():
             return None, "Locked section section_number must be a non-empty string."
 
-        found_code, problem_type, _ = check_course(raw_course_code)
+        found_code, problem_type, _ = find_course_code(raw_course_code)
         if problem_type:
             return None, f"Locked course '{raw_course_code}' was not found."
 
@@ -232,32 +243,32 @@ def get_locked_sections_map(raw_locked_sections):
     return locked_map, None
 
 
-def format_teacher_class(section):
-    day_text = clean_value(section["day"])
-    start_time = clean_value(section["start_time"])
-    end_time = clean_value(section["end_time"])
+def to_teacher_class_json(section):
+    day_text = clean_cell(section["day"])
+    start_time = clean_cell(section["start_time"])
+    end_time = clean_cell(section["end_time"])
 
     if day_text == "ONLINE":
         meeting_text = "ONLINE"
     else:
-        start_label = make_time_label(start_time)
-        end_label = make_time_label(end_time)
+        start_label = to_time_label(start_time)
+        end_label = to_time_label(end_time)
         meeting_text = f"{day_text} {start_label} - {end_label}"
 
     return {
-        "course_number": clean_value(section["course_number"]),
-        "course_name": clean_value(section["course_name"]),
-        "section_number": clean_value(section["section_number"]),
-        "term": clean_value(section["term"]),
+        "course_number": clean_cell(section["course_number"]),
+        "course_name": clean_cell(section["course_name"]),
+        "section_number": clean_cell(section["section_number"]),
+        "term": clean_cell(section["term"]),
         "meeting": meeting_text,
         "day": day_text,
-        "start_label": make_time_label(start_time),
-        "end_label": make_time_label(end_time),
-        "tricky_scale": clean_value(section["tricky_scale"])
+        "start_label": to_time_label(start_time),
+        "end_label": to_time_label(end_time),
+        "tricky_scale": clean_cell(section["tricky_scale"])
     }
 
 
-def build_teacher_items(query_text, term_filter):
+def build_teacher_list(query_text, term_filter):
     teacher_table = merged_rows.copy()
 
     if term_filter is not None:
@@ -279,22 +290,22 @@ def build_teacher_items(query_text, term_filter):
             ["course_number", "term", "day", "start_time", "section_number"],
             na_position="last"
         ).iterrows():
-            class_rows.append(format_teacher_class(one_class))
+            class_rows.append(to_teacher_class_json(one_class))
 
         teacher_items.append({
             "teacher_name": teacher_name,
-            "rmp_score": clean_value(first_row["rmp_score"]),
-            "difficulty": clean_value(first_row["difficulty"]),
-            "ideal": clean_value(first_row["ideal"]),
+            "rmp_score": clean_cell(first_row["rmp_score"]),
+            "difficulty": clean_cell(first_row["difficulty"]),
+            "ideal": clean_cell(first_row["ideal"]),
             "classes": class_rows
         })
 
     return teacher_items
 
 
-def check_course(user_text):
+def find_course_code(user_text):
     class_code = user_text.strip().upper()
-    normalized_input = normalize_code(class_code)
+    normalized_input = normalize_course_code(class_code)
     
     if not normalized_input:
         return None, "empty", None
@@ -308,7 +319,7 @@ def check_course(user_text):
     if normalized_input.isdigit():
         matching_codes = []
         for saved_code in class_codes:
-            if normalize_code(saved_code).endswith(normalized_input):
+            if normalize_course_code(saved_code).endswith(normalized_input):
                 matching_codes.append(saved_code)
         
         if len(matching_codes) == 1:
@@ -320,7 +331,7 @@ def check_course(user_text):
     return None, "missing", None
 
 
-def remove_duplicate_codes(code_list):
+def unique_course_codes(code_list):
     unique_codes = []
 
     for class_code in code_list:
@@ -330,7 +341,7 @@ def remove_duplicate_codes(code_list):
     return unique_codes
 
 
-def check_requested_codes(requested_codes):
+def validate_requested_codes(requested_codes):
     good_codes = []
     unclear_codes = []
     missing_codes = []
@@ -339,7 +350,7 @@ def check_requested_codes(requested_codes):
         if not isinstance(typed_code, str):
             return None, bad_request("Each course must be a string.")
 
-        found_code, problem_type, matching_codes = check_course(typed_code)
+        found_code, problem_type, matching_codes = find_course_code(typed_code)
 
         if problem_type == "empty":
             return None, bad_request("Course values cannot be empty.")
@@ -370,10 +381,10 @@ def check_requested_codes(requested_codes):
             missing_inputs=missing_codes
         )
 
-    return remove_duplicate_codes(good_codes), None
+    return unique_course_codes(good_codes), None
 
 
-def group_sections_by_code(code_list, term_filter, locked_sections):
+def get_sections_for_codes(code_list, term_filter, locked_sections):
     sections_for_each_code = {}
     missing_codes = []
 
@@ -400,7 +411,7 @@ def group_sections_by_code(code_list, term_filter, locked_sections):
     return sections_for_each_code, missing_codes
 
 
-def build_valid_schedules(sections_for_each_code, start_index, page_size):
+def find_valid_schedules(sections_for_each_code, start_index, page_size):
     valid_schedules_page = []
     checked_schedule_count = 0
     seen_valid_count = 0
@@ -413,7 +424,7 @@ def build_valid_schedules(sections_for_each_code, start_index, page_size):
             reached_max_checks = True
             break
 
-        if has_conflict(possible_schedule):
+        if schedule_has_conflict(possible_schedule):
             continue
 
         if seen_valid_count < start_index:
@@ -436,13 +447,13 @@ def build_valid_schedules(sections_for_each_code, start_index, page_size):
     return valid_schedules_page, has_more
 
 
-def format_schedules(schedule_list):
+def to_schedule_json(schedule_list):
     ready_schedules = []
 
     for one_schedule in schedule_list:
         ready_schedule = []
         for class_section in one_schedule:
-            ready_schedule.append(clean_section(class_section))
+            ready_schedule.append(to_section_json(class_section))
         ready_schedules.append(ready_schedule)
 
     return ready_schedules
@@ -453,7 +464,7 @@ def get_courses():
     course_items = []
 
     for _, course in courses.iterrows():
-        course_items.append(clean_course(course))
+        course_items.append(to_course_json(course))
 
     course_items.sort(key=sort_course_item)
     return jsonify({"courses": course_items})
@@ -464,7 +475,7 @@ def sort_course_item(course_item):
 
 
 @app.route("/schedule", methods=["POST", "OPTIONS"])
-def make_schedule():
+def build_schedule():
     if request.method == "OPTIONS":
         return ("", 204)
 
@@ -479,26 +490,26 @@ def make_schedule():
     if len(requested_codes) > MAX_CLASSES_PER_SEARCH:
         return bad_request(f"A maximum of {MAX_CLASSES_PER_SEARCH} courses is allowed per request.")
 
-    term_filter, term_error = get_term_number(body.get("term"))
+    term_filter, term_error = parse_term_number(body.get("term"))
     if term_error:
         return bad_request(term_error)
 
-    start_index, page_size, paging_error = get_paging_values(
+    start_index, page_size, paging_error = parse_paging_values(
         body.get("start_index"),
         body.get("page_size")
     )
     if paging_error:
         return bad_request(paging_error)
 
-    locked_sections, locked_error = get_locked_sections_map(body.get("locked_sections"))
+    locked_sections, locked_error = parse_locked_sections(body.get("locked_sections"))
     if locked_error:
         return bad_request(locked_error)
 
-    good_codes, error_response = check_requested_codes(requested_codes)
+    good_codes, error_response = validate_requested_codes(requested_codes)
     if error_response:
         return error_response
 
-    sections_for_each_code, missing_codes = group_sections_by_code(good_codes, term_filter, locked_sections)
+    sections_for_each_code, missing_codes = get_sections_for_codes(good_codes, term_filter, locked_sections)
     if missing_codes:
         return bad_request(
             "Courses not found for the selected term." if term_filter is not None else "Courses not found.",
@@ -506,8 +517,8 @@ def make_schedule():
             term=term_filter
         )
 
-    valid_schedules, has_more = build_valid_schedules(sections_for_each_code, start_index, page_size)
-    ready_schedules = format_schedules(valid_schedules)
+    valid_schedules, has_more = find_valid_schedules(sections_for_each_code, start_index, page_size)
+    ready_schedules = to_schedule_json(valid_schedules)
     first_schedule = ready_schedules[0] if ready_schedules else []
     next_start_index = start_index + len(ready_schedules)
 
@@ -527,7 +538,7 @@ def make_schedule():
 
 
 @app.route("/teachers/search", methods=["POST", "OPTIONS"])
-def search_teachers():
+def find_teachers():
     if request.method == "OPTIONS":
         return ("", 204)
 
@@ -539,11 +550,11 @@ def search_teachers():
     if not isinstance(query_text, str):
         return bad_request("'query' must be a string.")
 
-    term_filter, term_error = get_term_number(body.get("term"))
+    term_filter, term_error = parse_term_number(body.get("term"))
     if term_error:
         return bad_request(term_error)
 
-    teacher_items = build_teacher_items(query_text, term_filter)
+    teacher_items = build_teacher_list(query_text, term_filter)
 
     return jsonify({
         "teachers": teacher_items,
