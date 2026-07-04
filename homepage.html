@@ -12,14 +12,15 @@
   <body>
     <main class="page-shell">
       <section class="hero">
-        <h1>Your Class Scheduler</h1>
+        <h1>Dynamic Scheduling</h1>
+        <p>This is to create a personalized class schedule based on your preferences.</p>
         <label for="classRequest">Enter class codes (seperate with commas):</label>
         <div class="request-row course-request-row">
           <div class="class-search-input-wrap">
             <input id="classRequest" type="text" placeholder="CSE210,MATH119" />
             <button id="classClearBtn" class="btn-main btn-clear" type="button" aria-label="Clear class search">X</button>
           </div>
-          <button id="generateBtn" class="btn-main btn-generate" type="button">Get My Schedule</button>
+          <button id="generateBtn" class="btn-main btn-generate" type="button">Get Schedule</button>
           <button id="termBtn" class="btn-main btn-term" type="button">Term #</button>
           <button id="teacherBtn" class="btn-main btn-teachers" type="button">Teachers</button>
         </div>
@@ -34,6 +35,7 @@
           <div class="request-row">
             <div class="teacher-search-input-wrap">
               <input id="teacherRequest" type="text" placeholder="Start typing a teacher name" />
+              <button id="teacherInlineSearchBtn" class="btn-main btn-inline-search" type="button" aria-label="Search teachers">Search</button>
               <button id="teacherClearBtn" class="btn-main btn-clear" type="button" aria-label="Clear teacher search">X</button>
             </div>
             <button id="teacherSearchBtn" class="btn-main btn-search-teachers" type="button">Find Teachers</button>

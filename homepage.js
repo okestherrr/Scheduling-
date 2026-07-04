@@ -129,6 +129,10 @@ let nextScheduleStartIndex = 0;
 let currentRequest = null;
 let calendarResizeTimer = null;
 let calendarOptionsOpen = false;
+let customCalendarEvents = [];
+let draggedCustomEventId = null;
+let nextCustomEventId = 1;
+let customEventRepeatDays = new Set(["Mon"]);
 let calendarSettings = {
   startMinutes: 7 * 60,
   endMinutes: 17 * 60,
@@ -533,6 +537,18 @@ function makeCalendarInfo(classList) {
     classesByDay.Tue.sort((a, b) => a.start - b.start);
   }
 
+  customCalendarEvents.forEach(eventItem => {
+    if (!classesByDay[eventItem.day]) {
+      return;
+    }
+
+    classesByDay[eventItem.day].push({
+      ...eventItem,
+      isCustomEvent: true
+    });
+    classesByDay[eventItem.day].sort((a, b) => a.start - b.start);
+  });
+
   const allClassTimes = Object.values(classesByDay).flat();
 
   const firstMinute = calendarSettings.startMinutes;
@@ -644,6 +660,34 @@ function formatCourseSectionLabel(courseNumber, sectionNumber) {
 }
 
 
+function getReadableTextColor(hexColor, fallbackColor = "#0e3b2e") {
+  const cleanHex = String(hexColor || "").replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(cleanHex)) {
+    return fallbackColor;
+  }
+
+  const red = parseInt(cleanHex.slice(0, 2), 16);
+  const green = parseInt(cleanHex.slice(2, 4), 16);
+  const blue = parseInt(cleanHex.slice(4, 6), 16);
+  const brightness = (0.299 * red) + (0.587 * green) + (0.114 * blue);
+  return brightness > 165 ? "#14313a" : "#ffffff";
+}
+
+
+function darkenHexColor(hexColor, amount = 34, fallbackColor = "#2f7d67") {
+  const cleanHex = String(hexColor || "").replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(cleanHex)) {
+    return fallbackColor;
+  }
+
+  const red = Math.max(0, parseInt(cleanHex.slice(0, 2), 16) - amount);
+  const green = Math.max(0, parseInt(cleanHex.slice(2, 4), 16) - amount);
+  const blue = Math.max(0, parseInt(cleanHex.slice(4, 6), 16) - amount);
+
+  return `rgb(${red}, ${green}, ${blue})`;
+}
+
+
 function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
   const cardBox = document.createElement("article");
   const cardTop = (classItem.start - firstMinute) * pixelsPerMinute;
@@ -655,7 +699,9 @@ function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
   const difficultyText = classItem.difficulty ?? "N/A";
   const recommendedText = classItem.ideal === "Y" ? "Yes" : (classItem.ideal === "N" ? "No" : "N/A");
   const fullTeacherName = classItem.teacher_name || "Teacher";
-  const displayCourseSection = classItem.isDevotional
+  const displayCourseSection = classItem.isCustomEvent
+    ? String(classItem.course_number || "Custom Event")
+    : classItem.isDevotional
     ? "BYUI Devotional"
     : formatCourseSectionLabel(classItem.course_number, classItem.section_number);
   const teacherHoverText = `RateMyProfessor\nRating: ${ratingText}\nDifficulty: ${difficultyText}\nRecommended: ${recommendedText}`;
@@ -663,13 +709,32 @@ function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
   cardBox.className = `calendar-class-card${shouldHighlight ? " ideal" : ""}${isLocked ? " locked" : ""}${classItem.isDevotional ? " devotional" : ""}`;
   cardBox.style.top = `${cardTop}px`;
   cardBox.style.height = `${cardHeight}px`;
-  applyCourseColorStyles(cardBox, classItem);
-  cardBox.title = "Click to lock/unlock this course section for Manipulate";
-  cardBox.innerHTML = `
-    <strong>${displayCourseSection}</strong>
-    <span>${classItem.start_label} - ${classItem.end_label}</span>
-    <small class="teacher-hover-info" title="${teacherHoverText}\nTeacher: ${fullTeacherName}">${fullTeacherName}</small>
-  `;
+
+  if (classItem.isCustomEvent) {
+    const customColor = classItem.eventColor || "#8fe7d1";
+    const textColor = getReadableTextColor(customColor);
+    cardBox.classList.add("custom-event");
+    cardBox.draggable = true;
+    cardBox.dataset.eventId = String(classItem.eventId || "");
+    cardBox.style.background = customColor;
+    cardBox.style.color = textColor;
+    cardBox.style.border = `1px solid ${darkenHexColor(customColor)}`;
+    cardBox.title = "Drag to move this event. Hover to delete.";
+    cardBox.innerHTML = `
+      <button type="button" class="calendar-event-delete" data-event-id="${classItem.eventId}" aria-label="Delete event">X</button>
+      <strong>${displayCourseSection}</strong>
+      <span>${classItem.start_label} - ${classItem.end_label}</span>
+      <small>${fullTeacherName}</small>
+    `;
+  } else {
+    applyCourseColorStyles(cardBox, classItem);
+    cardBox.title = "Click to lock/unlock this course section for Manipulate";
+    cardBox.innerHTML = `
+      <strong>${displayCourseSection}</strong>
+      <span>${classItem.start_label} - ${classItem.end_label}</span>
+      <small class="teacher-hover-info" title="${teacherHoverText}\nTeacher: ${fullTeacherName}">${fullTeacherName}</small>
+    `;
+  }
 
   return cardBox;
 }
@@ -688,6 +753,50 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinu
   trackBox.className = "calendar-day-track";
   trackBox.style.height = `${totalHeight}px`;
 
+  trackBox.addEventListener("dragover", dragEvent => {
+    if (draggedCustomEventId === null) {
+      return;
+    }
+
+    dragEvent.preventDefault();
+    trackBox.classList.add("event-drop-target");
+  });
+
+  trackBox.addEventListener("dragleave", () => {
+    trackBox.classList.remove("event-drop-target");
+  });
+
+  trackBox.addEventListener("drop", dropEvent => {
+    if (draggedCustomEventId === null) {
+      return;
+    }
+
+    dropEvent.preventDefault();
+    trackBox.classList.remove("event-drop-target");
+
+    const targetEvent = customCalendarEvents.find(eventItem => eventItem.eventId === draggedCustomEventId);
+    draggedCustomEventId = null;
+    if (!targetEvent) {
+      return;
+    }
+
+    const eventDuration = targetEvent.end - targetEvent.start;
+    const maxStartMinute = Math.max(firstMinute, lastMinute - eventDuration);
+    const boxRect = trackBox.getBoundingClientRect();
+    const pointerMinute = firstMinute + ((dropEvent.clientY - boxRect.top) / pixelsPerMinute);
+    let snappedStartMinute = Math.round(pointerMinute / calendarGapMinutes) * calendarGapMinutes;
+    snappedStartMinute = Math.max(firstMinute, Math.min(maxStartMinute, snappedStartMinute));
+
+    targetEvent.day = dayName;
+    targetEvent.start = snappedStartMinute;
+    targetEvent.end = snappedStartMinute + eventDuration;
+    targetEvent.start_label = minutesToClock(targetEvent.start);
+    targetEvent.end_label = minutesToClock(targetEvent.end);
+
+    byId("requestMessage").textContent = "Event moved.";
+    renderCurrentSchedule();
+  });
+
   addHourLines(trackBox, firstMinute, lastMinute, pixelsPerMinute);
 
   classesByDay[dayName].forEach(classItem => {
@@ -702,7 +811,44 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinu
     };
 
     const classCard = makeClassCard(visibleClass, firstMinute, pixelsPerMinute);
+
+    if (classItem.isCustomEvent) {
+      classCard.addEventListener("dragstart", dragEvent => {
+        draggedCustomEventId = classItem.eventId;
+        classCard.classList.add("dragging");
+
+        if (dragEvent.dataTransfer) {
+          dragEvent.dataTransfer.effectAllowed = "move";
+          dragEvent.dataTransfer.setData("text/plain", String(classItem.eventId));
+        }
+      });
+
+      classCard.addEventListener("dragend", () => {
+        draggedCustomEventId = null;
+        classCard.classList.remove("dragging");
+        document.querySelectorAll(".calendar-day-track.event-drop-target")
+          .forEach(trackItem => trackItem.classList.remove("event-drop-target"));
+      });
+
+      const deleteButton = classCard.querySelector(".calendar-event-delete");
+      if (deleteButton) {
+        deleteButton.addEventListener("click", clickEvent => {
+          clickEvent.preventDefault();
+          clickEvent.stopPropagation();
+
+          const eventId = Number(deleteButton.dataset.eventId);
+          customCalendarEvents = customCalendarEvents.filter(eventItem => eventItem.eventId !== eventId);
+          byId("requestMessage").textContent = "Event deleted.";
+          renderCurrentSchedule();
+        });
+      }
+    }
+
     classCard.addEventListener("click", () => {
+      if (classItem.isCustomEvent) {
+        return;
+      }
+
       toggleLockedSection(classItem);
       renderScheduleButtons();
       renderCurrentSchedule();
@@ -778,6 +924,45 @@ function showCalendar(classList) {
           <input id="calendarShowDevotional" type="checkbox" ${calendarSettings.showDevotional ? "checked" : ""} /> Devotional
         </label>
       </div>
+      <div class="calendar-options-event-field">
+        <span>Add Event</span>
+        <div class="calendar-options-event-controls">
+          <input id="calendarEventTitle" type="text" maxlength="40" placeholder="Event name" />
+          <label class="calendar-options-field calendar-options-event-color-field" for="calendarEventColor">
+            <span>Color</span>
+            <input id="calendarEventColor" type="color" value="#8fe7d1" />
+          </label>
+          <div class="calendar-event-repeat">
+            <span class="calendar-event-repeat-label">Repeat on</span>
+            <div class="calendar-repeat-days">
+              ${[
+                ["Sun", "S"],
+                ["Mon", "M"],
+                ["Tue", "T"],
+                ["Wed", "W"],
+                ["Thu", "T"],
+                ["Fri", "F"],
+                ["Sat", "S"]
+              ].map(([dayValue, dayLabel]) => {
+                const isActive = customEventRepeatDays.has(dayValue);
+                return `<button type="button" class="calendar-repeat-day${isActive ? " active" : ""}" data-day="${dayValue}" aria-pressed="${isActive ? "true" : "false"}">${dayLabel}</button>`;
+              }).join("")}
+            </div>
+          </div>
+          <div class="calendar-event-time-row">
+            <label class="calendar-options-field calendar-options-event-time-field" for="calendarEventStart">
+              <span>Start Time</span>
+              <input id="calendarEventStart" type="time" step="900" />
+            </label>
+            <label class="calendar-options-field calendar-options-event-time-field" for="calendarEventEnd">
+              <span>End Time</span>
+              <input id="calendarEventEnd" type="time" step="900" />
+            </label>
+          </div>
+          <button id="calendarAddEventBtn" class="btn-main" type="button">Add</button>
+          <button id="calendarClearEventsBtn" class="btn-main" type="button">Clear</button>
+        </div>
+      </div>
     `;
 
     box.appendChild(optionsPanel);
@@ -787,6 +972,77 @@ function showCalendar(classList) {
     const startInput = optionsPanel.querySelector("#calendarStartTime");
     const endInput = optionsPanel.querySelector("#calendarEndTime");
     const devotionalInput = optionsPanel.querySelector("#calendarShowDevotional");
+    const eventTitleInput = optionsPanel.querySelector("#calendarEventTitle");
+    const eventColorInput = optionsPanel.querySelector("#calendarEventColor");
+    const eventStartInput = optionsPanel.querySelector("#calendarEventStart");
+    const eventEndInput = optionsPanel.querySelector("#calendarEventEnd");
+    const addEventButton = optionsPanel.querySelector("#calendarAddEventBtn");
+    const clearEventsButton = optionsPanel.querySelector("#calendarClearEventsBtn");
+    const repeatDayButtons = [...optionsPanel.querySelectorAll(".calendar-repeat-day")];
+
+    repeatDayButtons.forEach(dayButton => {
+      dayButton.addEventListener("click", () => {
+        const dayValue = dayButton.dataset.day;
+        if (!dayValue) {
+          return;
+        }
+
+        if (customEventRepeatDays.has(dayValue)) {
+          customEventRepeatDays.delete(dayValue);
+        } else {
+          customEventRepeatDays.add(dayValue);
+        }
+
+        const isActive = customEventRepeatDays.has(dayValue);
+        dayButton.classList.toggle("active", isActive);
+        dayButton.setAttribute("aria-pressed", isActive ? "true" : "false");
+      });
+    });
+
+    function addCustomEventFromInputs() {
+      const eventTitle = (eventTitleInput.value || "").trim() || "Custom Event";
+      const eventColor = (eventColorInput && eventColorInput.value) || "#8fe7d1";
+      const selectedDays = [...customEventRepeatDays];
+      const startMinutes = parseTimeInputToMinutes(eventStartInput.value);
+      const endMinutes = parseTimeInputToMinutes(eventEndInput.value);
+
+      if (!selectedDays.length) {
+        byId("requestMessage").textContent = "Select at least one repeat day.";
+        return;
+      }
+
+      if (startMinutes === null || endMinutes === null) {
+        byId("requestMessage").textContent = "Please enter valid event start/end times.";
+        return;
+      }
+
+      if (endMinutes <= startMinutes) {
+        byId("requestMessage").textContent = "Event end time must be after event start time.";
+        return;
+      }
+
+      selectedDays.forEach(dayValue => {
+        customCalendarEvents.push({
+          eventId: nextCustomEventId,
+          course_number: eventTitle,
+          section_number: "",
+          day: dayValue,
+          start: startMinutes,
+          end: endMinutes,
+          start_label: minutesToClock(startMinutes),
+          end_label: minutesToClock(endMinutes),
+          teacher_name: "Added Event",
+          eventColor
+        });
+        nextCustomEventId += 1;
+      });
+
+      byId("requestMessage").textContent = `Event added to ${selectedDays.length} day(s).`;
+      eventTitleInput.value = "";
+      eventStartInput.value = "";
+      eventEndInput.value = "";
+      renderCurrentSchedule();
+    }
 
     function applyCalendarOptions(showValidationError) {
       const startMinutes = parseTimeInputToMinutes(startInput.value);
@@ -838,6 +1094,12 @@ function showCalendar(classList) {
     devotionalInput.addEventListener("change", () => applyCalendarOptions(false));
     startInput.addEventListener("change", () => applyCalendarOptions(true));
     endInput.addEventListener("change", () => applyCalendarOptions(true));
+    addEventButton.addEventListener("click", addCustomEventFromInputs);
+    clearEventsButton.addEventListener("click", () => {
+      customCalendarEvents = [];
+      byId("requestMessage").textContent = "Added events cleared.";
+      renderCurrentSchedule();
+    });
   }
 
   const calendarInfo = makeCalendarInfo(classList);
@@ -1027,7 +1289,7 @@ function applyServerSchedules(serverData, appendMode, preserveLockedSections) {
       ? `Loaded ${loadedSchedules.length} more schedule(s). Showing ${schedules.length} total.`
       : `No additional schedules found. Showing ${schedules.length} total.`;
   } else {
-    byId("requestMessage").textContent = `Showing ${schedules.length} potential schedule(s).`;
+    byId("requestMessage").textContent = "";
   }
 
   renderScheduleButtons();
@@ -1308,6 +1570,7 @@ byId("teacherBtn").addEventListener("click", () => {
   }
 });
 byId("teacherSearchBtn").addEventListener("click", runTeacherSearch);
+byId("teacherInlineSearchBtn").addEventListener("click", runTeacherSearch);
 byId("teacherClearBtn").addEventListener("click", () => {
   byId("teacherRequest").value = "";
   clearTeacherUi();
