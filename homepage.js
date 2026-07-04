@@ -19,6 +19,19 @@ const allCalendarDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const weekdayCalendarDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const schedulePageSize = 5;
 const calendarGapMinutes = 15;
+const reminderDayToIndex = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const presetEventColors = [
+  "#F6A5A5", "#EF5350",
+  "#F7B267", "#FB8C00",
+  "#F7E588", "#FDD835",
+  "#B8E986", "#7CB342",
+  "#7ED7C1", "#26A69A",
+  "#8AD2F4", "#1E88E5",
+  "#B39DDB", "#5E35B1",
+  "#D6A4EB", "#8E24AA",
+  "#F8A6D1", "#D81B60",
+  "#D7CCC8", "#8D6E63"
+];
 
 function getApiUrls(pathSuffix) {
   const urlList = [];
@@ -133,6 +146,29 @@ let customCalendarEvents = [];
 let draggedCustomEventId = null;
 let nextCustomEventId = 1;
 let customEventRepeatDays = new Set(["Mon"]);
+let lastDeletedCustomEvent = null;
+let undoDeleteTimer = null;
+const undoDeleteTimeoutMs = 8000;
+let calendarZoom = 1;
+const calendarZoomMin = 0.6;
+const calendarZoomMax = 2;
+const calendarZoomStep = 0.2;
+let selectedEventColor = presetEventColors[8];
+let scheduledEventAlerts = [];
+let nextScheduledAlertId = 1;
+let schedulerMode = "course";
+let alertPanelOpen = false;
+let workEmployeeIdCounter = 1;
+let activePaletteCloseListener = null;
+let workHoursPanelOpen = false;
+let workHoursEnabled = false;
+let generatedCourseWorkEvents = [];
+let workHoursSettings = {
+  targetHours: "",
+  startMinutes: 9 * 60,
+  endMinutes: 18 * 60,
+  days: new Set(["Mon", "Tue", "Wed", "Thu", "Fri"])
+};
 let calendarSettings = {
   startMinutes: 7 * 60,
   endMinutes: 17 * 60,
@@ -549,11 +585,36 @@ function makeCalendarInfo(classList) {
     classesByDay[eventItem.day].sort((a, b) => a.start - b.start);
   });
 
+  if (workHoursEnabled) {
+    generatedCourseWorkEvents = makeCourseWorkEventsForSchedule(classList);
+    generatedCourseWorkEvents.forEach(eventItem => {
+      if (!classesByDay[eventItem.day]) {
+        return;
+      }
+
+      classesByDay[eventItem.day].push({
+        ...eventItem,
+        isCustomEvent: true,
+        isGeneratedWorkHour: true
+      });
+      classesByDay[eventItem.day].sort((a, b) => a.start - b.start);
+    });
+  } else {
+    generatedCourseWorkEvents = [];
+  }
+
   const allClassTimes = Object.values(classesByDay).flat();
 
   const firstMinute = calendarSettings.startMinutes;
-  const lastMinute = calendarSettings.endMinutes;
-  const pixelsPerMinute = 1.3;
+  const latestEventEnd = allClassTimes.reduce(
+    (latestMinute, classItem) => Math.max(latestMinute, classItem.end || firstMinute),
+    firstMinute
+  );
+  const extendedEndMinute = latestEventEnd > calendarSettings.endMinutes
+    ? latestEventEnd + 30
+    : calendarSettings.endMinutes;
+  const lastMinute = Math.max(calendarSettings.endMinutes, extendedEndMinute);
+  const pixelsPerMinute = 1.3 * calendarZoom;
   const totalHeight = Math.max(540, ((lastMinute - firstMinute) * pixelsPerMinute) + 20);
 
   return {
@@ -688,11 +749,249 @@ function darkenHexColor(hexColor, amount = 34, fallbackColor = "#2f7d67") {
 }
 
 
+function clearPendingDeletedEvent() {
+  lastDeletedCustomEvent = null;
+
+  if (undoDeleteTimer !== null) {
+    window.clearTimeout(undoDeleteTimer);
+    undoDeleteTimer = null;
+  }
+}
+
+
+function storeDeletedEventForUndo(eventItem) {
+  clearPendingDeletedEvent();
+  lastDeletedCustomEvent = { ...eventItem };
+
+  undoDeleteTimer = window.setTimeout(() => {
+    lastDeletedCustomEvent = null;
+    undoDeleteTimer = null;
+
+    if (schedules.length) {
+      renderCurrentSchedule();
+    }
+  }, undoDeleteTimeoutMs);
+}
+
+
+function restoreLastDeletedEvent() {
+  if (!lastDeletedCustomEvent) {
+    return;
+  }
+
+  customCalendarEvents.push({ ...lastDeletedCustomEvent });
+  clearPendingDeletedEvent();
+  byId("requestMessage").textContent = "Event restored.";
+  renderCurrentSchedule();
+}
+
+
+function adjustCalendarZoom(delta) {
+  const nextZoom = Math.max(calendarZoomMin, Math.min(calendarZoomMax, calendarZoom + delta));
+  if (Math.abs(nextZoom - calendarZoom) < 0.001) {
+    return;
+  }
+
+  calendarZoom = Number(nextZoom.toFixed(2));
+  renderCurrentSchedule();
+}
+
+
+function runPrintSchedule() {
+  const calendarBoard = document.querySelector("#scheduleGrid .calendar-board");
+  if (!calendarBoard) {
+    byId("requestMessage").textContent = "Load a schedule before printing.";
+    return;
+  }
+
+  document.body.classList.add("print-calendar-only");
+  window.print();
+  window.setTimeout(() => {
+    document.body.classList.remove("print-calendar-only");
+  }, 100);
+}
+
+
+function clearScheduledAlertById(alertId) {
+  const alertItem = scheduledEventAlerts.find(oneAlert => oneAlert.id === alertId);
+  if (alertItem && alertItem.timeoutId !== null) {
+    window.clearTimeout(alertItem.timeoutId);
+  }
+
+  scheduledEventAlerts = scheduledEventAlerts.filter(oneAlert => oneAlert.id !== alertId);
+}
+
+
+function clearScheduledAlertsForEvent(eventId) {
+  scheduledEventAlerts
+    .filter(oneAlert => oneAlert.eventId === eventId)
+    .forEach(oneAlert => {
+      if (oneAlert.timeoutId !== null) {
+        window.clearTimeout(oneAlert.timeoutId);
+      }
+    });
+
+  scheduledEventAlerts = scheduledEventAlerts.filter(oneAlert => oneAlert.eventId !== eventId);
+}
+
+
+function clearAllScheduledAlerts() {
+  scheduledEventAlerts.forEach(oneAlert => {
+    if (oneAlert.timeoutId !== null) {
+      window.clearTimeout(oneAlert.timeoutId);
+    }
+  });
+
+  scheduledEventAlerts = [];
+}
+
+
+function getNextEventDate(dayName, startMinutes) {
+  const now = new Date();
+  const targetDay = reminderDayToIndex[dayName];
+  if (targetDay === undefined) {
+    return null;
+  }
+
+  const nextDate = new Date(now);
+  nextDate.setSeconds(0, 0);
+
+  const dayOffset = (targetDay - now.getDay() + 7) % 7;
+  nextDate.setDate(now.getDate() + dayOffset);
+  nextDate.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+
+  if (nextDate <= now) {
+    nextDate.setDate(nextDate.getDate() + 7);
+  }
+
+  return nextDate;
+}
+
+
+function makeCourseWorkEventsForSchedule(classList) {
+  if (schedulerMode !== "course") {
+    return [];
+  }
+
+  const targetMinutes = Math.max(0, Number(workHoursSettings.targetHours || 0) * 60);
+  if (targetMinutes <= 0 || !workHoursSettings.days.size) {
+    return [];
+  }
+
+  const classesByDay = splitClassesByDay(classList || []);
+  const orderedDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const generatedEvents = [];
+  let remainingMinutes = targetMinutes;
+
+  for (const dayName of orderedDays) {
+    if (remainingMinutes <= 0) {
+      break;
+    }
+
+    if (!workHoursSettings.days.has(dayName)) {
+      continue;
+    }
+
+    const busyBlocks = (classesByDay[dayName] || [])
+      .filter(classItem => classItem.end > workHoursSettings.startMinutes && classItem.start < workHoursSettings.endMinutes)
+      .sort((a, b) => a.start - b.start);
+
+    let cursor = workHoursSettings.startMinutes;
+    for (const busyBlock of busyBlocks) {
+      if (cursor < busyBlock.start && remainingMinutes > 0) {
+        const availableMinutes = busyBlock.start - cursor;
+        const usedMinutes = Math.min(availableMinutes, remainingMinutes);
+        if (usedMinutes >= 30) {
+          generatedEvents.push({
+            eventId: `course-work-${dayName}-${cursor}-${cursor + usedMinutes}`,
+            course_number: "Work Hours",
+            section_number: "",
+            day: dayName,
+            start: cursor,
+            end: cursor + usedMinutes,
+            start_label: minutesToClock(cursor),
+            end_label: minutesToClock(cursor + usedMinutes),
+            teacher_name: "Work block",
+            eventColor: "#4f86ff",
+            isGeneratedWorkHour: true
+          });
+          remainingMinutes -= usedMinutes;
+        }
+      }
+
+      cursor = Math.max(cursor, busyBlock.end);
+    }
+
+    if (cursor < workHoursSettings.endMinutes && remainingMinutes > 0) {
+      const availableMinutes = workHoursSettings.endMinutes - cursor;
+      const usedMinutes = Math.min(availableMinutes, remainingMinutes);
+      if (usedMinutes >= 30) {
+        generatedEvents.push({
+          eventId: `course-work-${dayName}-${cursor}-${cursor + usedMinutes}`,
+          course_number: "Work Hours",
+          section_number: "",
+          day: dayName,
+          start: cursor,
+          end: cursor + usedMinutes,
+          start_label: minutesToClock(cursor),
+          end_label: minutesToClock(cursor + usedMinutes),
+          teacher_name: "Work block",
+          eventColor: "#4f86ff",
+          isGeneratedWorkHour: true
+        });
+        remainingMinutes -= usedMinutes;
+      }
+    }
+  }
+
+  return generatedEvents;
+}
+
+
+function scheduleEventAlertForEvent(eventItem, minutesBefore) {
+  const nextEventDate = getNextEventDate(eventItem.day, eventItem.start);
+  if (!nextEventDate) {
+    return false;
+  }
+
+  const reminderDate = new Date(nextEventDate.getTime() - (minutesBefore * 60 * 1000));
+  const now = Date.now();
+  let delayMs = reminderDate.getTime() - now;
+
+  if (delayMs <= 0) {
+    const futureReminder = new Date(reminderDate.getTime() + (7 * 24 * 60 * 60 * 1000));
+    delayMs = futureReminder.getTime() - now;
+  }
+
+  if (delayMs <= 0) {
+    return false;
+  }
+
+  const alertId = nextScheduledAlertId;
+  nextScheduledAlertId += 1;
+
+  const timeoutId = window.setTimeout(() => {
+    window.alert(`${minutesBefore} minutes until ${eventItem.course_number}.`);
+    clearScheduledAlertById(alertId);
+  }, delayMs);
+
+  scheduledEventAlerts.push({
+    id: alertId,
+    eventId: eventItem.eventId,
+    minutesBefore,
+    timeoutId
+  });
+
+  return true;
+}
+
+
 function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
   const cardBox = document.createElement("article");
   const cardTop = (classItem.start - firstMinute) * pixelsPerMinute;
   const durationHeight = (classItem.end - classItem.start) * pixelsPerMinute;
-  const cardHeight = Math.max(84, durationHeight);
+  const minVisibleHeight = classItem.isCustomEvent ? 8 : 10;
+  const cardHeight = Math.max(minVisibleHeight, durationHeight);
   const shouldHighlight = classItem.ideal || classItem.is_ideal;
   const isLocked = isLockedSection(classItem);
   const ratingText = classItem.rmp_score ?? "N/A";
@@ -714,14 +1013,16 @@ function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
     const customColor = classItem.eventColor || "#8fe7d1";
     const textColor = getReadableTextColor(customColor);
     cardBox.classList.add("custom-event");
-    cardBox.draggable = true;
+    cardBox.draggable = !classItem.isGeneratedWorkHour;
     cardBox.dataset.eventId = String(classItem.eventId || "");
     cardBox.style.background = customColor;
     cardBox.style.color = textColor;
     cardBox.style.border = `1px solid ${darkenHexColor(customColor)}`;
-    cardBox.title = "Drag to move this event. Hover to delete.";
+    cardBox.title = classItem.isGeneratedWorkHour
+      ? "Generated work block"
+      : "Drag to move this event. Hover to delete.";
     cardBox.innerHTML = `
-      <button type="button" class="calendar-event-delete" data-event-id="${classItem.eventId}" aria-label="Delete event">X</button>
+      ${classItem.isGeneratedWorkHour ? "" : `<button type="button" class="calendar-event-delete" data-event-id="${classItem.eventId}" aria-label="Delete event">X</button>`}
       <strong>${displayCourseSection}</strong>
       <span>${classItem.start_label} - ${classItem.end_label}</span>
       <small>${fullTeacherName}</small>
@@ -784,7 +1085,7 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinu
     const maxStartMinute = Math.max(firstMinute, lastMinute - eventDuration);
     const boxRect = trackBox.getBoundingClientRect();
     const pointerMinute = firstMinute + ((dropEvent.clientY - boxRect.top) / pixelsPerMinute);
-    let snappedStartMinute = Math.round(pointerMinute / calendarGapMinutes) * calendarGapMinutes;
+    let snappedStartMinute = Math.round(pointerMinute);
     snappedStartMinute = Math.max(firstMinute, Math.min(maxStartMinute, snappedStartMinute));
 
     targetEvent.day = dayName;
@@ -812,7 +1113,7 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinu
 
     const classCard = makeClassCard(visibleClass, firstMinute, pixelsPerMinute);
 
-    if (classItem.isCustomEvent) {
+    if (classItem.isCustomEvent && !classItem.isGeneratedWorkHour) {
       classCard.addEventListener("dragstart", dragEvent => {
         draggedCustomEventId = classItem.eventId;
         classCard.classList.add("dragging");
@@ -837,8 +1138,15 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinu
           clickEvent.stopPropagation();
 
           const eventId = Number(deleteButton.dataset.eventId);
+          const deletedEvent = customCalendarEvents.find(eventItem => eventItem.eventId === eventId);
+          if (!deletedEvent) {
+            return;
+          }
+
+          storeDeletedEventForUndo(deletedEvent);
+          clearScheduledAlertsForEvent(eventId);
           customCalendarEvents = customCalendarEvents.filter(eventItem => eventItem.eventId !== eventId);
-          byId("requestMessage").textContent = "Event deleted.";
+          byId("requestMessage").textContent = "Event deleted. Undo available for a few seconds.";
           renderCurrentSchedule();
         });
       }
@@ -863,6 +1171,7 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinu
 function showCalendar(classList) {
   const box = byId("scheduleGrid");
   box.innerHTML = "";
+  clearActivePaletteListener();
 
   const calendarActions = document.createElement("div");
   calendarActions.className = "calendar-actions";
@@ -875,6 +1184,23 @@ function showCalendar(classList) {
     calendarOptionsOpen = !calendarOptionsOpen;
     renderCurrentSchedule();
   });
+
+  const workHoursButton = document.createElement("button");
+  workHoursButton.type = "button";
+  workHoursButton.className = `btn-main calendar-workhours-btn${workHoursPanelOpen ? " active" : ""}`;
+  workHoursButton.textContent = "Add Work Hours";
+  workHoursButton.title = "Generate work-hour blocks around class schedules";
+  workHoursButton.addEventListener("click", () => {
+    workHoursPanelOpen = !workHoursPanelOpen;
+    renderCurrentSchedule();
+  });
+
+  const printButton = document.createElement("button");
+  printButton.type = "button";
+  printButton.className = "btn-main calendar-print-btn";
+  printButton.textContent = "Print Schedule";
+  printButton.title = "Print or save only the calendar as PDF";
+  printButton.addEventListener("click", runPrintSchedule);
 
   const favoriteButton = document.createElement("button");
   favoriteButton.type = "button";
@@ -891,7 +1217,12 @@ function showCalendar(classList) {
   });
 
   calendarActions.appendChild(optionsButton);
+  if (schedulerMode === "course") {
+    calendarActions.appendChild(workHoursButton);
+  }
+  calendarActions.appendChild(printButton);
   calendarActions.appendChild(favoriteButton);
+
   box.appendChild(calendarActions);
 
   if (calendarOptionsOpen) {
@@ -906,11 +1237,11 @@ function showCalendar(classList) {
 
     optionsPanel.innerHTML = `
       <label class="calendar-options-field calendar-options-start-field">
-        <span>Start Time</span>
+        <span>Calendar Start Time</span>
         <input id="calendarStartTime" type="time" step="900" value="${minutesToInputTime(calendarSettings.startMinutes)}" />
       </label>
       <label class="calendar-options-field calendar-options-end-field">
-        <span>End Time</span>
+        <span>Calendar End Time</span>
         <input id="calendarEndTime" type="time" step="900" value="${minutesToInputTime(calendarSettings.endMinutes)}" />
       </label>
       <div class="calendar-options-weekends calendar-options-weekends-field days-group">
@@ -924,43 +1255,75 @@ function showCalendar(classList) {
           <input id="calendarShowDevotional" type="checkbox" ${calendarSettings.showDevotional ? "checked" : ""} /> Devotional
         </label>
       </div>
-      <div class="calendar-options-event-field">
-        <span>Add Event</span>
-        <div class="calendar-options-event-controls">
-          <input id="calendarEventTitle" type="text" maxlength="40" placeholder="Event name" />
-          <label class="calendar-options-field calendar-options-event-color-field" for="calendarEventColor">
-            <span>Color</span>
-            <input id="calendarEventColor" type="color" value="#8fe7d1" />
-          </label>
-          <div class="calendar-event-repeat">
-            <span class="calendar-event-repeat-label">Repeat on</span>
-            <div class="calendar-repeat-days">
-              ${[
-                ["Sun", "S"],
-                ["Mon", "M"],
-                ["Tue", "T"],
-                ["Wed", "W"],
-                ["Thu", "T"],
-                ["Fri", "F"],
-                ["Sat", "S"]
-              ].map(([dayValue, dayLabel]) => {
-                const isActive = customEventRepeatDays.has(dayValue);
-                return `<button type="button" class="calendar-repeat-day${isActive ? " active" : ""}" data-day="${dayValue}" aria-pressed="${isActive ? "true" : "false"}">${dayLabel}</button>`;
-              }).join("")}
+      <div class="calendar-event-alert-row">
+        <div class="calendar-options-event-field">
+          <span>Create Event</span>
+          <div class="calendar-options-event-controls">
+            <input id="calendarEventTitle" type="text" maxlength="40" placeholder="Event name" />
+            <div class="calendar-options-event-color-field">
+              <span>Color</span>
+              <button id="calendarColorSwatch" type="button" class="calendar-color-swatch" aria-label="Pick event color"></button>
+              <div id="calendarColorPalette" class="calendar-color-palette" hidden>
+                ${presetEventColors.map(colorValue => `<button type="button" class="calendar-color-choice" data-color="${colorValue}" style="background:${colorValue}" aria-label="Select ${colorValue}"></button>`).join("")}
+              </div>
             </div>
+            <div class="calendar-event-repeat">
+              <span class="calendar-event-repeat-label">Repeat on</span>
+              <div class="calendar-repeat-days">
+                ${[
+                  ["Sun", "S"],
+                  ["Mon", "M"],
+                  ["Tue", "T"],
+                  ["Wed", "W"],
+                  ["Thu", "T"],
+                  ["Fri", "F"],
+                  ["Sat", "S"]
+                ].map(([dayValue, dayLabel]) => {
+                  const isActive = customEventRepeatDays.has(dayValue);
+                  return `<button type="button" class="calendar-repeat-day${isActive ? " active" : ""}" data-day="${dayValue}" aria-pressed="${isActive ? "true" : "false"}">${dayLabel}</button>`;
+                }).join("")}
+              </div>
+            </div>
+            <div class="calendar-event-time-row">
+              <label class="calendar-options-field calendar-options-event-time-field" for="calendarEventStart">
+                <span>Start Time</span>
+                <input id="calendarEventStart" type="time" step="60" />
+              </label>
+              <label class="calendar-options-field calendar-options-event-time-field" for="calendarEventEnd">
+                <span>End Time</span>
+                <input id="calendarEventEnd" type="time" step="60" />
+              </label>
+            </div>
+            <button id="calendarAddEventBtn" class="btn-main" type="button">Add</button>
+            <button id="calendarClearEventsBtn" class="btn-main" type="button">Clear</button>
           </div>
-          <div class="calendar-event-time-row">
-            <label class="calendar-options-field calendar-options-event-time-field" for="calendarEventStart">
-              <span>Start Time</span>
-              <input id="calendarEventStart" type="time" step="900" />
+        </div>
+        <div class="calendar-options-alert-field">
+          <button id="calendarAlertToggleBtn" class="btn-main calendar-alert-toggle-btn" type="button" aria-expanded="${alertPanelOpen ? "true" : "false"}">Create Alert for Event</button>
+          <div id="calendarAlertBody" class="calendar-options-alert-controls" ${alertPanelOpen ? "" : "hidden"}>
+            <label class="calendar-options-field" for="calendarAlertEvent">
+              <span>Event</span>
+              <select id="calendarAlertEvent">
+                <option value="">Select an event</option>
+                ${customCalendarEvents.map(eventItem => `<option value="${eventItem.eventId}">${eventItem.course_number} (${eventItem.day} ${eventItem.start_label})</option>`).join("")}
+              </select>
             </label>
-            <label class="calendar-options-field calendar-options-event-time-field" for="calendarEventEnd">
-              <span>End Time</span>
-              <input id="calendarEventEnd" type="time" step="900" />
+            <label class="calendar-options-field" for="calendarAlertOffset">
+              <span>Reminder</span>
+              <select id="calendarAlertOffset">
+                <option value="10">10 minutes before</option>
+                <option value="15">15 minutes before</option>
+                <option value="30">30 minutes before</option>
+                <option value="custom">Custom</option>
+              </select>
             </label>
+            <label class="calendar-options-field" id="calendarAlertCustomWrap" for="calendarAlertCustom" hidden>
+              <span>Custom Minutes</span>
+              <input id="calendarAlertCustom" type="number" min="1" step="1" placeholder="Minutes before" />
+            </label>
+            <button id="calendarCreateAlertBtn" class="btn-main" type="button">Set Alert</button>
+            <p id="calendarAlertMessage" class="calendar-alert-message"></p>
           </div>
-          <button id="calendarAddEventBtn" class="btn-main" type="button">Add</button>
-          <button id="calendarClearEventsBtn" class="btn-main" type="button">Clear</button>
         </div>
       </div>
     `;
@@ -973,12 +1336,98 @@ function showCalendar(classList) {
     const endInput = optionsPanel.querySelector("#calendarEndTime");
     const devotionalInput = optionsPanel.querySelector("#calendarShowDevotional");
     const eventTitleInput = optionsPanel.querySelector("#calendarEventTitle");
-    const eventColorInput = optionsPanel.querySelector("#calendarEventColor");
+    const colorSwatchButton = optionsPanel.querySelector("#calendarColorSwatch");
+    const colorPalette = optionsPanel.querySelector("#calendarColorPalette");
+    const colorChoiceButtons = [...optionsPanel.querySelectorAll(".calendar-color-choice")];
     const eventStartInput = optionsPanel.querySelector("#calendarEventStart");
     const eventEndInput = optionsPanel.querySelector("#calendarEventEnd");
+    const alertEventSelect = optionsPanel.querySelector("#calendarAlertEvent");
+    const alertOffsetSelect = optionsPanel.querySelector("#calendarAlertOffset");
+    const alertCustomWrap = optionsPanel.querySelector("#calendarAlertCustomWrap");
+    const alertCustomInput = optionsPanel.querySelector("#calendarAlertCustom");
+    const createAlertButton = optionsPanel.querySelector("#calendarCreateAlertBtn");
+    const alertMessageBox = optionsPanel.querySelector("#calendarAlertMessage");
+    const alertToggleButton = optionsPanel.querySelector("#calendarAlertToggleBtn");
+    const alertBody = optionsPanel.querySelector("#calendarAlertBody");
     const addEventButton = optionsPanel.querySelector("#calendarAddEventBtn");
     const clearEventsButton = optionsPanel.querySelector("#calendarClearEventsBtn");
     const repeatDayButtons = [...optionsPanel.querySelectorAll(".calendar-repeat-day")];
+
+    if (colorSwatchButton) {
+      colorSwatchButton.style.background = selectedEventColor;
+    }
+
+    if (colorPalette && colorSwatchButton) {
+      function closeColorPalette() {
+        colorPalette.hidden = true;
+        colorPalette.classList.remove("open-upward");
+        clearActivePaletteListener();
+      }
+
+      function openColorPalette() {
+        colorPalette.hidden = false;
+        colorPalette.classList.remove("open-upward");
+
+        const swatchRect = colorSwatchButton.getBoundingClientRect();
+        const paletteRect = colorPalette.getBoundingClientRect();
+        const spacing = 6;
+
+        let top = swatchRect.bottom + spacing;
+        let openUpward = false;
+        if ((top + paletteRect.height) > (window.innerHeight - 8)) {
+          top = swatchRect.top - paletteRect.height - spacing;
+          openUpward = true;
+        }
+
+        let left = swatchRect.left;
+        left = Math.max(8, Math.min(left, window.innerWidth - paletteRect.width - 8));
+        top = Math.max(8, top);
+
+        colorPalette.style.left = `${left}px`;
+        colorPalette.style.top = `${top}px`;
+        colorPalette.classList.toggle("open-upward", openUpward);
+
+        clearActivePaletteListener();
+        activePaletteCloseListener = clickEvent => {
+          if (clickEvent.target === colorSwatchButton || colorPalette.contains(clickEvent.target)) {
+            return;
+          }
+
+          closeColorPalette();
+        };
+        document.addEventListener("mousedown", activePaletteCloseListener);
+      }
+
+      colorSwatchButton.addEventListener("click", clickEvent => {
+        clickEvent.preventDefault();
+        if (colorPalette.hidden) {
+          openColorPalette();
+        } else {
+          closeColorPalette();
+        }
+      });
+
+      colorChoiceButtons.forEach(colorButton => {
+        colorButton.addEventListener("click", () => {
+          const pickedColor = colorButton.dataset.color;
+          if (!pickedColor) {
+            return;
+          }
+
+          selectedEventColor = pickedColor;
+          colorSwatchButton.style.background = pickedColor;
+          closeColorPalette();
+        });
+      });
+    }
+
+    if (alertToggleButton && alertBody) {
+      alertToggleButton.addEventListener("click", () => {
+        alertPanelOpen = !alertPanelOpen;
+        alertBody.hidden = !alertPanelOpen;
+        alertToggleButton.setAttribute("aria-expanded", alertPanelOpen ? "true" : "false");
+      });
+    }
 
     repeatDayButtons.forEach(dayButton => {
       dayButton.addEventListener("click", () => {
@@ -1001,7 +1450,7 @@ function showCalendar(classList) {
 
     function addCustomEventFromInputs() {
       const eventTitle = (eventTitleInput.value || "").trim() || "Custom Event";
-      const eventColor = (eventColorInput && eventColorInput.value) || "#8fe7d1";
+      const eventColor = selectedEventColor;
       const selectedDays = [...customEventRepeatDays];
       const startMinutes = parseTimeInputToMinutes(eventStartInput.value);
       const endMinutes = parseTimeInputToMinutes(eventEndInput.value);
@@ -1017,7 +1466,7 @@ function showCalendar(classList) {
       }
 
       if (endMinutes <= startMinutes) {
-        byId("requestMessage").textContent = "Event end time must be after event start time.";
+        byId("requestMessage").textContent = "The end time must be after the start time. Please choose a valid time.";
         return;
       }
 
@@ -1042,6 +1491,41 @@ function showCalendar(classList) {
       eventStartInput.value = "";
       eventEndInput.value = "";
       renderCurrentSchedule();
+    }
+
+    function updateCustomReminderVisibility() {
+      const isCustomReminder = alertOffsetSelect.value === "custom";
+      alertCustomWrap.hidden = !isCustomReminder;
+      if (!isCustomReminder) {
+        alertCustomInput.value = "";
+      }
+    }
+
+    function createReminderForEvent() {
+      alertMessageBox.textContent = "";
+      const selectedEventId = Number(alertEventSelect.value);
+      const selectedEvent = customCalendarEvents.find(eventItem => eventItem.eventId === selectedEventId);
+      if (!selectedEvent) {
+        alertMessageBox.textContent = "Select an event first.";
+        return;
+      }
+
+      let minutesBefore = 0;
+      if (alertOffsetSelect.value === "custom") {
+        minutesBefore = Number.parseInt((alertCustomInput.value || "").trim(), 10);
+      } else {
+        minutesBefore = Number.parseInt(alertOffsetSelect.value, 10);
+      }
+
+      if (!Number.isInteger(minutesBefore) || minutesBefore <= 0) {
+        alertMessageBox.textContent = "Enter a valid reminder time.";
+        return;
+      }
+
+      const wasScheduled = scheduleEventAlertForEvent(selectedEvent, minutesBefore);
+      alertMessageBox.textContent = wasScheduled
+        ? "Alert is set."
+        : "Could not set alert for that event.";
     }
 
     function applyCalendarOptions(showValidationError) {
@@ -1094,10 +1578,94 @@ function showCalendar(classList) {
     devotionalInput.addEventListener("change", () => applyCalendarOptions(false));
     startInput.addEventListener("change", () => applyCalendarOptions(true));
     endInput.addEventListener("change", () => applyCalendarOptions(true));
+    alertOffsetSelect.addEventListener("change", updateCustomReminderVisibility);
+    createAlertButton.addEventListener("click", createReminderForEvent);
+    updateCustomReminderVisibility();
     addEventButton.addEventListener("click", addCustomEventFromInputs);
     clearEventsButton.addEventListener("click", () => {
       customCalendarEvents = [];
+      clearPendingDeletedEvent();
+      clearAllScheduledAlerts();
       byId("requestMessage").textContent = "Added events cleared.";
+      renderCurrentSchedule();
+    });
+  }
+
+  if (schedulerMode === "course" && workHoursPanelOpen) {
+    const workHoursPanel = document.createElement("section");
+    workHoursPanel.className = "calendar-workhours-panel";
+    workHoursPanel.innerHTML = `
+      <h3>Add Work Hours</h3>
+      <div class="calendar-workhours-grid">
+        <label class="calendar-options-field" for="workTargetHoursInput">
+          <span>How many hours do you want to work?</span>
+          <input id="workTargetHoursInput" type="number" min="1" step="1" value="${workHoursSettings.targetHours}" />
+        </label>
+        <label class="calendar-options-field" for="workStartInput">
+          <span>Work Start Time</span>
+          <input id="workStartInput" type="time" step="60" value="${minutesToInputTime(workHoursSettings.startMinutes)}" />
+        </label>
+        <label class="calendar-options-field" for="workEndInput">
+          <span>Work End Time</span>
+          <input id="workEndInput" type="time" step="60" value="${minutesToInputTime(workHoursSettings.endMinutes)}" />
+        </label>
+      </div>
+      <div class="calendar-workhours-days">
+        <span>What days can you work?</span>
+        <div class="workhours-day-buttons">
+          ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(dayName => `<button type="button" class="workhours-day-btn${workHoursSettings.days.has(dayName) ? " active" : ""}" data-day="${dayName}">${dayName}</button>`).join("")}
+        </div>
+      </div>
+      <div class="calendar-workhours-actions">
+        <button id="generateWorkHoursBtn" class="btn-main" type="button">Generate Work Hours</button>
+      </div>
+    `;
+
+    box.appendChild(workHoursPanel);
+
+    const targetHoursInput = workHoursPanel.querySelector("#workTargetHoursInput");
+    const workStartInput = workHoursPanel.querySelector("#workStartInput");
+    const workEndInput = workHoursPanel.querySelector("#workEndInput");
+    const dayButtons = [...workHoursPanel.querySelectorAll(".workhours-day-btn")];
+
+    dayButtons.forEach(dayButton => {
+      dayButton.addEventListener("click", () => {
+        dayButton.classList.toggle("active");
+      });
+    });
+
+    workHoursPanel.querySelector("#generateWorkHoursBtn").addEventListener("click", () => {
+      const targetHours = Number.parseInt((targetHoursInput.value || "").trim(), 10);
+      const startMinutes = parseTimeInputToMinutes(workStartInput.value);
+      const endMinutes = parseTimeInputToMinutes(workEndInput.value);
+      const selectedDays = new Set(
+        dayButtons.filter(dayButton => dayButton.classList.contains("active")).map(dayButton => dayButton.dataset.day)
+      );
+
+      if (!Number.isInteger(targetHours) || targetHours <= 0) {
+        byId("requestMessage").textContent = "Enter a valid number of work hours.";
+        return;
+      }
+
+      if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+        byId("requestMessage").textContent = "Work end time must be after start time.";
+        return;
+      }
+
+      if (!selectedDays.size) {
+        byId("requestMessage").textContent = "Select at least one work day.";
+        return;
+      }
+
+      workHoursSettings = {
+        targetHours,
+        startMinutes,
+        endMinutes,
+        days: selectedDays
+      };
+      workHoursEnabled = true;
+
+      byId("requestMessage").textContent = "Generated work-hour blocks shown in blue.";
       renderCurrentSchedule();
     });
   }
@@ -1124,10 +1692,53 @@ function showCalendar(classList) {
 
   calendarBox.appendChild(makeTimeSide(firstMinute, lastMinute, pixelsPerMinute));
 
+  const visibleDays = getVisibleDays();
+
+  const dayArea = document.createElement("div");
+  dayArea.className = "calendar-days-area";
+  dayArea.style.setProperty("--calendar-columns", String(visibleDays.length));
+
+  const toolbarRow = document.createElement("div");
+  toolbarRow.className = "calendar-toolbar-row";
+  toolbarRow.style.setProperty("--calendar-columns", String(visibleDays.length));
+
+  const toolbarControls = document.createElement("div");
+  toolbarControls.className = "calendar-toolbar-controls";
+  toolbarControls.style.gridColumn = String(visibleDays.length);
+
+  const zoomOutButton = document.createElement("button");
+  zoomOutButton.type = "button";
+  zoomOutButton.className = "btn-main calendar-zoom-btn";
+  zoomOutButton.textContent = "-";
+  zoomOutButton.title = "Zoom out calendar rows";
+  zoomOutButton.disabled = calendarZoom <= calendarZoomMin + 0.001;
+  zoomOutButton.addEventListener("click", () => adjustCalendarZoom(-calendarZoomStep));
+
+  const zoomInButton = document.createElement("button");
+  zoomInButton.type = "button";
+  zoomInButton.className = "btn-main calendar-zoom-btn";
+  zoomInButton.textContent = "+";
+  zoomInButton.title = "Zoom in calendar rows";
+  zoomInButton.disabled = calendarZoom >= calendarZoomMax - 0.001;
+  zoomInButton.addEventListener("click", () => adjustCalendarZoom(calendarZoomStep));
+
+  const undoButton = document.createElement("button");
+  undoButton.type = "button";
+  undoButton.className = "btn-main calendar-undo-btn";
+  undoButton.textContent = "↶ Undo";
+  undoButton.title = lastDeletedCustomEvent
+    ? "Restore the most recently deleted event"
+    : "No deleted event to restore";
+  undoButton.disabled = !lastDeletedCustomEvent;
+  undoButton.addEventListener("click", restoreLastDeletedEvent);
+
+  toolbarControls.appendChild(zoomOutButton);
+  toolbarControls.appendChild(zoomInButton);
+  toolbarControls.appendChild(undoButton);
+  toolbarRow.appendChild(toolbarControls);
+
   const dayBoxes = document.createElement("div");
   dayBoxes.className = "calendar-days";
-
-  const visibleDays = getVisibleDays();
   dayBoxes.style.setProperty("--calendar-columns", String(visibleDays.length));
   visibleDays.forEach(dayName => {
     dayBoxes.appendChild(
@@ -1135,7 +1746,9 @@ function showCalendar(classList) {
     );
   });
 
-  calendarBox.appendChild(dayBoxes);
+  dayArea.appendChild(toolbarRow);
+  dayArea.appendChild(dayBoxes);
+  calendarBox.appendChild(dayArea);
   box.appendChild(calendarBox);
 }
 
@@ -1508,6 +2121,207 @@ function runResetManipulatedSchedules() {
 }
 
 
+function clearActivePaletteListener() {
+  if (activePaletteCloseListener) {
+    document.removeEventListener("mousedown", activePaletteCloseListener);
+    activePaletteCloseListener = null;
+  }
+}
+
+
+function showWelcomeScreen() {
+  byId("welcomeScreen").hidden = false;
+  byId("appShell").hidden = true;
+  clearActivePaletteListener();
+}
+
+
+function setSchedulerMode(nextMode) {
+  if (nextMode === "work") {
+    window.location.href = "./WorkScheduler.html";
+    return;
+  }
+
+  schedulerMode = nextMode;
+  byId("welcomeScreen").hidden = true;
+  byId("appShell").hidden = false;
+
+  const showCourse = nextMode === "course";
+  const showWork = nextMode === "work";
+  byId("courseHero").hidden = !showCourse;
+  byId("workHero").hidden = !showWork;
+
+  byId("selectedHeader").textContent = nextMode === "work"
+    ? "Scheduled Shifts"
+    : "Selected Classes";
+}
+
+
+function makeWorkDayChips(selectedDays = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"])) {
+  return allCalendarDays.map(dayName => {
+    const isSelected = selectedDays.has(dayName);
+    return `<button type="button" class="work-day-chip${isSelected ? " active" : ""}" data-day="${dayName}">${dayName.slice(0, 1)}</button>`;
+  }).join("");
+}
+
+
+function addEmployeeRow(defaultData = {}) {
+  const employeeList = byId("employeeList");
+  const rowId = `workEmployee${workEmployeeIdCounter}`;
+  workEmployeeIdCounter += 1;
+
+  const selectedDays = new Set(defaultData.days || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
+  const rowBox = document.createElement("section");
+  rowBox.className = "work-employee-row";
+  rowBox.dataset.rowId = rowId;
+  rowBox.innerHTML = `
+    <h3>Employee</h3>
+    <div class="work-employee-fields">
+      <label class="calendar-options-field" for="${rowId}Name">
+        <span>Employee Name</span>
+        <input id="${rowId}Name" class="work-name" type="text" placeholder="Employee name" value="${defaultData.name || ""}" />
+      </label>
+      <label class="calendar-options-field" for="${rowId}Preferred">
+        <span>Preferred Hours</span>
+        <input id="${rowId}Preferred" class="work-hours" type="number" min="1" max="80" step="1" value="${defaultData.preferredHours || 20}" />
+      </label>
+      <label class="calendar-options-field" for="${rowId}Start">
+        <span>Availability Start</span>
+        <input id="${rowId}Start" class="work-start" type="time" step="60" value="${defaultData.start || "09:00"}" />
+      </label>
+      <label class="calendar-options-field" for="${rowId}End">
+        <span>Availability End</span>
+        <input id="${rowId}End" class="work-end" type="time" step="60" value="${defaultData.end || "17:00"}" />
+      </label>
+    </div>
+    <div class="work-days-row">
+      <span>Availability Days</span>
+      <div class="work-day-chips">${makeWorkDayChips(selectedDays)}</div>
+      <button type="button" class="btn-main work-remove-btn">Remove</button>
+    </div>
+  `;
+
+  rowBox.querySelectorAll(".work-day-chip").forEach(dayButton => {
+    dayButton.addEventListener("click", () => {
+      dayButton.classList.toggle("active");
+    });
+  });
+
+  const removeButton = rowBox.querySelector(".work-remove-btn");
+  removeButton.addEventListener("click", () => {
+    rowBox.remove();
+  });
+
+  employeeList.appendChild(rowBox);
+}
+
+
+function parseEmployeeRows() {
+  const rows = [...document.querySelectorAll(".work-employee-row")];
+  return rows.map(rowBox => {
+    const name = rowBox.querySelector(".work-name").value.trim();
+    const preferredHours = Number.parseInt(rowBox.querySelector(".work-hours").value, 10);
+    const startMinutes = parseTimeInputToMinutes(rowBox.querySelector(".work-start").value);
+    const endMinutes = parseTimeInputToMinutes(rowBox.querySelector(".work-end").value);
+    const selectedDays = [...rowBox.querySelectorAll(".work-day-chip.active")].map(button => button.dataset.day);
+
+    return {
+      name,
+      preferredHours,
+      startMinutes,
+      endMinutes,
+      selectedDays
+    };
+  });
+}
+
+
+function runWorkScheduleGeneration() {
+  const employees = parseEmployeeRows();
+  if (!employees.length) {
+    byId("workMessage").textContent = "Add at least one employee.";
+    return;
+  }
+
+  const generatedEvents = [];
+  const employeeColorMap = new Map();
+  const dayNextStart = { Mon: null, Tue: null, Wed: null, Thu: null, Fri: null, Sat: null, Sun: null };
+  let colorIndex = 0;
+
+  for (const employee of employees) {
+    if (!employee.name) {
+      byId("workMessage").textContent = "Each employee needs a name.";
+      return;
+    }
+
+    if (!employee.selectedDays.length) {
+      byId("workMessage").textContent = `Choose at least one availability day for ${employee.name}.`;
+      return;
+    }
+
+    if (employee.startMinutes === null || employee.endMinutes === null || employee.endMinutes <= employee.startMinutes) {
+      byId("workMessage").textContent = `Enter valid availability times for ${employee.name}.`;
+      return;
+    }
+
+    if (!Number.isInteger(employee.preferredHours) || employee.preferredHours <= 0) {
+      byId("workMessage").textContent = `Enter preferred weekly hours for ${employee.name}.`;
+      return;
+    }
+
+    const preferredMinutes = employee.preferredHours * 60;
+    const perDayTarget = Math.max(60, Math.floor(preferredMinutes / employee.selectedDays.length));
+
+    if (!employeeColorMap.has(employee.name)) {
+      employeeColorMap.set(employee.name, presetEventColors[colorIndex % presetEventColors.length]);
+      colorIndex += 1;
+    }
+    const employeeColor = employeeColorMap.get(employee.name);
+
+    employee.selectedDays.forEach(dayName => {
+      const availableMinutes = employee.endMinutes - employee.startMinutes;
+      const shiftMinutes = Math.min(availableMinutes, perDayTarget);
+      const candidateStart = dayNextStart[dayName] === null
+        ? employee.startMinutes
+        : Math.max(employee.startMinutes, dayNextStart[dayName]);
+      const shiftStart = Math.min(candidateStart, employee.endMinutes - 30);
+      const shiftEnd = Math.min(employee.endMinutes, shiftStart + shiftMinutes);
+
+      if (shiftEnd <= shiftStart) {
+        return;
+      }
+
+      generatedEvents.push({
+        eventId: nextCustomEventId,
+        course_number: employee.name,
+        section_number: "",
+        day: dayName,
+        start: shiftStart,
+        end: shiftEnd,
+        start_label: minutesToClock(shiftStart),
+        end_label: minutesToClock(shiftEnd),
+        teacher_name: `Preferred ${employee.preferredHours}h/week`,
+          eventColor: employeeColor
+      });
+      nextCustomEventId += 1;
+      dayNextStart[dayName] = Math.min(employee.endMinutes, shiftEnd + 10);
+    });
+  }
+
+  customCalendarEvents = generatedEvents;
+  clearPendingDeletedEvent();
+  clearAllScheduledAlerts();
+  schedules = [[]];
+  currentScheduleIndex = 0;
+  hasMoreSchedules = false;
+  byId("workMessage").textContent = `Generated ${generatedEvents.length} shift(s).`;
+  byId("requestMessage").textContent = "Work schedule ready.";
+  toggleResultsPanel(true);
+  renderScheduleButtons();
+  renderCurrentSchedule();
+}
+
+
 async function runTeacherSearch() {
   const typedTeacher = byId("teacherRequest").value.trim();
   const chosenTerm = getTermNumber();
@@ -1542,6 +2356,33 @@ async function runTeacherSearch() {
     byId("teacherMessage").textContent = `Could not reach the scheduler API. Details: ${error.message}`;
   }
 }
+
+
+function ensureWorkEmployeeRows() {
+  if (!document.querySelector(".work-employee-row")) {
+    addEmployeeRow();
+  }
+}
+
+
+byId("welcomeCourseBtn").addEventListener("click", () => {
+  setSchedulerMode("course");
+});
+
+byId("welcomeWorkBtn").addEventListener("click", () => {
+  window.location.href = "./WorkScheduler.html";
+});
+
+byId("topHomeBtn").addEventListener("click", showWelcomeScreen);
+byId("topCourseBtn").addEventListener("click", () => setSchedulerMode("course"));
+byId("topWorkBtn").addEventListener("click", () => {
+  window.location.href = "./WorkScheduler.html";
+});
+
+byId("addEmployeeBtn").addEventListener("click", () => addEmployeeRow());
+byId("getWorkScheduleBtn").addEventListener("click", () => {
+  window.location.href = "./WorkScheduler.html";
+});
 
 
 byId("termBtn").addEventListener("click", () => {
@@ -1602,6 +2443,15 @@ toggleTermPanel(false);
 toggleLoadMoreBtn(false);
 toggleManipulateBtn(false);
 toggleResetBtn(false);
+
+const initialView = new URLSearchParams(window.location.search).get("view");
+if (initialView === "course") {
+  setSchedulerMode("course");
+} else if (initialView === "work") {
+  window.location.href = "./WorkScheduler.html";
+} else {
+  showWelcomeScreen();
+}
 
 window.addEventListener("resize", () => {
   if (calendarResizeTimer !== null) {

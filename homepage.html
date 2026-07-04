@@ -11,54 +11,83 @@
   </head>
   <body>
     <main class="page-shell">
-      <section class="hero">
-        <h1>Dynamic Scheduling</h1>
-        <p>This is to create a personalized class schedule based on your preferences.</p>
-        <label for="classRequest">Enter class codes (seperate with commas):</label>
-        <div class="request-row course-request-row">
-          <div class="class-search-input-wrap">
-            <input id="classRequest" type="text" placeholder="CSE210,MATH119" />
-            <button id="classClearBtn" class="btn-main btn-clear" type="button" aria-label="Clear class search">X</button>
-          </div>
-          <button id="generateBtn" class="btn-main btn-generate" type="button">Get Schedule</button>
-          <button id="termBtn" class="btn-main btn-term" type="button">Term #</button>
-          <button id="teacherBtn" class="btn-main btn-teachers" type="button">Teachers</button>
+      <div class="top-home-row">
+        <button id="topHomeBtn" class="btn-main mode-switch-btn" type="button">Home</button>
+        <button id="topCourseBtn" class="btn-main mode-switch-btn" type="button">Course Scheduling</button>
+        <button id="topWorkBtn" class="btn-main mode-switch-btn" type="button">Work Scheduling</button>
+      </div>
+
+      <section id="welcomeScreen" class="hero welcome-screen">
+        <h1>Welcome to Dynamic Scheduling</h1>
+        <p class="welcome-question">What would you like to schedule?</p>
+        <div class="welcome-actions">
+          <button id="welcomeCourseBtn" class="btn-main welcome-btn" type="button">Course Scheduling</button>
+          <button id="welcomeWorkBtn" class="btn-main welcome-btn" type="button">Work Scheduling</button>
         </div>
-        <div id="termPanel" hidden>
-          <div class="term-row">
-            <label for="termInput">Term number:</label>
-            <input id="termInput" type="number" min="1" step="1" placeholder="Term #" />
-          </div>
-        </div>
-        <div id="teacherSearchPanel" hidden>
-          <label for="teacherRequest">Teacher Search:</label>
-          <div class="request-row">
-            <div class="teacher-search-input-wrap">
-              <input id="teacherRequest" type="text" placeholder="Start typing a teacher name" />
-              <button id="teacherInlineSearchBtn" class="btn-main btn-inline-search" type="button" aria-label="Search teachers">Search</button>
-              <button id="teacherClearBtn" class="btn-main btn-clear" type="button" aria-label="Clear teacher search">X</button>
-            </div>
-            <button id="teacherSearchBtn" class="btn-main btn-search-teachers" type="button">Find Teachers</button>
-          </div>
-        </div>
-        <p id="requestMessage"></p>
-        <p id="teacherMessage"></p>
-        <div id="teacherResults"></div>
       </section>
-      <section class="results-panel">
-        <div class="schedule-options-header">
-          <h2>Schedule Options</h2>
-          <div class="schedule-options-actions">
-            <button id="manipulateBtn" class="btn-main btn-manipulate" type="button" hidden>Manipulate</button>
-            <button id="resetManipulatedBtn" class="btn-main btn-reset" type="button" hidden>Reset</button>
-            <button id="loadMoreBtn" class="btn-main btn-load-more" type="button" hidden>Load More</button>
+
+      <section id="appShell" hidden>
+        <section class="hero" id="courseHero">
+          <h1>Dynamic Scheduling</h1>
+          <p>This is to create a personalized class schedule based on your preferences.</p>
+          <label for="classRequest">Enter class codes (seperate with commas):</label>
+          <div class="request-row course-request-row">
+            <div class="class-search-input-wrap">
+              <input id="classRequest" type="text" placeholder="CSE210,MATH119" />
+              <button id="classClearBtn" class="btn-main btn-clear" type="button" aria-label="Clear class search">X</button>
+            </div>
+            <button id="generateBtn" class="btn-main btn-generate" type="button">Get Schedule</button>
+            <button id="termBtn" class="btn-main btn-term" type="button">Term #</button>
+            <button id="teacherBtn" class="btn-main btn-teachers" type="button">Teachers</button>
           </div>
-        </div>
-        <div id="scheduleOptions"></div>
-        <h2>Selected Classes</h2>
-        <div id="selectedSections"></div>
-        <h2>Weekly Calendar</h2>
-        <div id="scheduleGrid"></div>
+          <div id="termPanel" hidden>
+            <div class="term-row">
+              <label for="termInput">Term number:</label>
+              <input id="termInput" type="number" min="1" step="1" placeholder="Term #" />
+            </div>
+          </div>
+          <div id="teacherSearchPanel" hidden>
+            <label for="teacherRequest">Teacher Search:</label>
+            <div class="request-row">
+              <div class="teacher-search-input-wrap">
+                <input id="teacherRequest" type="text" placeholder="Start typing a teacher name" />
+                <button id="teacherInlineSearchBtn" class="btn-main btn-inline-search" type="button" aria-label="Search teachers">Search</button>
+                <button id="teacherClearBtn" class="btn-main btn-clear" type="button" aria-label="Clear teacher search">X</button>
+              </div>
+              <button id="teacherSearchBtn" class="btn-main btn-search-teachers" type="button">Find Teachers</button>
+            </div>
+          </div>
+          <p id="requestMessage"></p>
+          <p id="teacherMessage"></p>
+          <div id="teacherResults"></div>
+        </section>
+
+        <section class="hero" id="workHero" hidden>
+          <h1>Work Scheduler</h1>
+          <p>Enter employees, availability, and preferred weekly hours.</p>
+          <div id="employeeList"></div>
+          <div class="request-row work-actions-row">
+            <button id="addEmployeeBtn" class="btn-main" type="button">Add Another Employee</button>
+            <button id="getWorkScheduleBtn" class="btn-main" type="button">Get Schedule</button>
+          </div>
+          <p id="workMessage"></p>
+        </section>
+
+        <section class="results-panel">
+          <div class="schedule-options-header">
+            <h2>Schedule Options</h2>
+            <div class="schedule-options-actions">
+              <button id="manipulateBtn" class="btn-main btn-manipulate" type="button" hidden>Manipulate</button>
+              <button id="resetManipulatedBtn" class="btn-main btn-reset" type="button" hidden>Reset</button>
+              <button id="loadMoreBtn" class="btn-main btn-load-more" type="button" hidden>Load More</button>
+            </div>
+          </div>
+          <div id="scheduleOptions"></div>
+          <h2 id="selectedHeader">Selected Classes</h2>
+          <div id="selectedSections"></div>
+          <h2>Weekly Calendar</h2>
+          <div id="scheduleGrid"></div>
+        </section>
       </section>
     </main>
   </body>

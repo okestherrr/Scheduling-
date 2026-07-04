@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Work Scheduler</title>
+    <link rel="stylesheet" href="./homepage.css" />
+    <script src="./workScheduler.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <div class="top-home-row">
+        <a class="btn-main mode-switch-btn" href="./homepage.html?view=course">Course Scheduling</a>
+        <a class="btn-main mode-switch-btn" href="./WorkScheduler.html">Work Scheduling</a>
+      </div>
+
+      <section class="hero" id="workHero">
+        <h1>Work Scheduler</h1>
+        <p>Enter employees, availability, and preferred weekly hours.</p>
+        <div id="employeeList"></div>
+        <div class="request-row work-actions-row">
+          <button id="addEmployeeBtn" class="btn-main" type="button">Add Another Employee</button>
+          <button id="getWorkScheduleBtn" class="btn-main" type="button">Get Schedule</button>
+        </div>
+        <p id="workMessage"></p>
+      </section>
+
+      <section class="results-panel">
+        <h2>Scheduled Shifts</h2>
+        <p id="requestMessage"></p>
+        <div id="scheduleGrid"></div>
+        <div id="workTotals" class="work-totals-panel" hidden></div>
+      </section>
+    </main>
+  </body>
+</html>
