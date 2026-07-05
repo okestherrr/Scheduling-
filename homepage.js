@@ -1599,7 +1599,7 @@ function showCalendar(classList) {
       <div class="calendar-workhours-grid">
         <label class="calendar-options-field" for="workTargetHoursInput">
           <span>How many hours do you want to work?</span>
-          <input id="workTargetHoursInput" type="number" min="1" step="1" value="${workHoursSettings.targetHours}" />
+          <input id="workTargetHoursInput" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 12" value="${workHoursSettings.targetHours}" />
         </label>
         <label class="calendar-options-field" for="workStartInput">
           <span>Work Start Time</span>

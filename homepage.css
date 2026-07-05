@@ -184,6 +184,75 @@ a.mode-switch-btn {
   border-bottom: none;
 }
 
+.calendar-workhours-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #0d6074;
+  padding: 0 2px;
+}
+
+.calendar-workhours-btn:hover,
+.calendar-workhours-btn.active {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.calendar-workhours-panel {
+  margin: 10px 0 14px;
+  padding: 12px;
+  border: 1px solid #b8d8df;
+  background: #f4fbff;
+  position: relative;
+  z-index: 2;
+}
+
+.calendar-workhours-panel h3 {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+}
+
+.calendar-workhours-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.calendar-workhours-grid input,
+.calendar-workhours-days button {
+  pointer-events: auto;
+}
+
+.calendar-workhours-days {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.workhours-day-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workhours-day-btn {
+  min-width: 48px;
+  padding: 6px 10px;
+  border: 1px solid #9fc6d2;
+  background: #ebf7fb;
+  color: #0d6074;
+  cursor: pointer;
+}
+
+.workhours-day-btn.active {
+  background: #4f86ff;
+  color: #fff;
+  border-color: #3f73e0;
+}
+
+.calendar-workhours-actions {
+  margin-top: 8px;
+}
+
 .hero,
 .results-panel {
   background: var(--box-color);
@@ -502,6 +571,7 @@ h2 {
 }
 
 .calendar-options-btn,
+.calendar-workhours-btn,
 .calendar-save-btn,
 .btn-options,
 .btn-save {
@@ -510,7 +580,8 @@ h2 {
   color: #0d6074;
 }
 
-.calendar-options-btn.active {
+.calendar-options-btn.active,
+.calendar-workhours-btn.active {
   background: #cfeffd;
 }
 
@@ -523,6 +594,7 @@ h2 {
 #manipulateBtn,
 #resetManipulatedBtn,
 .calendar-options-btn,
+.calendar-workhours-btn,
 .calendar-undo-btn {
   background: transparent !important;
   border: none !important;
@@ -546,8 +618,10 @@ h2 {
 #manipulateBtn:hover,
 #resetManipulatedBtn:hover,
 .calendar-options-btn:hover,
+.calendar-workhours-btn:hover,
 .calendar-undo-btn:hover,
-.calendar-options-btn.active {
+.calendar-options-btn.active,
+.calendar-workhours-btn.active {
   background: transparent !important;
   text-decoration: underline;
   text-underline-offset: 2px;
