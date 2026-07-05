@@ -2132,6 +2132,18 @@ function clearActivePaletteListener() {
 function showWelcomeScreen() {
   byId("welcomeScreen").hidden = false;
   byId("appShell").hidden = true;
+  const topHomeButton = byId("topHomeBtn");
+  const topCourseButton = byId("topCourseBtn");
+  const topWorkButton = byId("topWorkBtn");
+  if (topHomeButton) {
+    topHomeButton.hidden = true;
+  }
+  if (topCourseButton) {
+    topCourseButton.hidden = false;
+  }
+  if (topWorkButton) {
+    topWorkButton.hidden = false;
+  }
   clearActivePaletteListener();
 }
 
@@ -2145,6 +2157,18 @@ function setSchedulerMode(nextMode) {
   schedulerMode = nextMode;
   byId("welcomeScreen").hidden = true;
   byId("appShell").hidden = false;
+  const topHomeButton = byId("topHomeBtn");
+  const topCourseButton = byId("topCourseBtn");
+  const topWorkButton = byId("topWorkBtn");
+  if (topHomeButton) {
+    topHomeButton.hidden = false;
+  }
+  if (topCourseButton) {
+    topCourseButton.hidden = true;
+  }
+  if (topWorkButton) {
+    topWorkButton.hidden = false;
+  }
 
   const showCourse = nextMode === "course";
   const showWork = nextMode === "work";
@@ -2373,11 +2397,22 @@ byId("welcomeWorkBtn").addEventListener("click", () => {
   window.location.href = "./WorkScheduler.html";
 });
 
-byId("topHomeBtn").addEventListener("click", showWelcomeScreen);
-byId("topCourseBtn").addEventListener("click", () => setSchedulerMode("course"));
-byId("topWorkBtn").addEventListener("click", () => {
-  window.location.href = "./WorkScheduler.html";
-});
+const topHomeButton = byId("topHomeBtn");
+if (topHomeButton) {
+  topHomeButton.addEventListener("click", showWelcomeScreen);
+}
+
+const topCourseButton = byId("topCourseBtn");
+if (topCourseButton) {
+  topCourseButton.addEventListener("click", () => setSchedulerMode("course"));
+}
+
+const topWorkButton = byId("topWorkBtn");
+if (topWorkButton) {
+  topWorkButton.addEventListener("click", () => {
+    window.location.href = "./WorkScheduler.html";
+  });
+}
 
 byId("addEmployeeBtn").addEventListener("click", () => addEmployeeRow());
 byId("getWorkScheduleBtn").addEventListener("click", () => {
