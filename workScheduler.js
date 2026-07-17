@@ -17,15 +17,15 @@ const dayGroupOptions = [
   { value: "Weekend", label: "Weekend (Sat-Sun)" }
 ];
 
-let workEmployeeIdCounter = 1;
-let shiftTemplateIdCounter = 1;
-let nextShiftId = 1;
-let generatedShifts = [];
-let generatedEmployees = [];
-let generatedCoverage = [];
-const employeeColorMap = new Map();
+let employeeRowIdCounter = 1;
+let templateRowIdCounter = 1;
+let nextGeneratedShiftId = 1;
+let generatedShiftList = [];
+let generatedEmployeeList = [];
+let generatedCoverageList = [];
+const employeeColorByName = new Map();
 
-function byId(id) {
+function getElementById(id) {
   return document.getElementById(id);
 }
 
@@ -81,18 +81,18 @@ function minutesToHourAmPm(totalMinutes) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
-function makeWorkDayChips(selectedDays = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"])) {
+function buildWorkDayChipButtons(selectedDays = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"])) {
   return allCalendarDays.map(dayName => {
     const isSelected = selectedDays.has(dayName);
     return `<button type="button" class="work-day-chip${isSelected ? " active" : ""}" data-day="${dayName}">${dayName.slice(0, 1)}</button>`;
   }).join("");
 }
 
-function setWorkStep(stepName) {
-  const employeeStep = byId("workEmployeeStep");
-  const templateStep = byId("workTemplateStep");
-  const employeeTab = byId("workStepEmployeesBtn");
-  const templateTab = byId("workStepTemplatesBtn");
+function showWorkStep(stepName) {
+  const employeeStep = getElementById("workEmployeeStep");
+  const templateStep = getElementById("workTemplateStep");
+  const employeeTab = getElementById("workStepEmployeesBtn");
+  const templateTab = getElementById("workStepTemplatesBtn");
   const isEmployeeStep = stepName === "employees";
 
   employeeStep.hidden = !isEmployeeStep;
@@ -102,11 +102,11 @@ function setWorkStep(stepName) {
 }
 
 function clearEmployeeRows() {
-  byId("employeeList").innerHTML = "";
+  getElementById("employeeList").innerHTML = "";
 }
 
 function clearShiftTemplateRows() {
-  byId("shiftTemplateList").innerHTML = "";
+  getElementById("shiftTemplateList").innerHTML = "";
 }
 
 function randomInt(min, max) {
@@ -163,7 +163,7 @@ function generateEmployeeTestingData() {
     });
   });
 
-  byId("workMessage").textContent = "Testing data loaded for employees.";
+  getElementById("workMessage").textContent = "Testing data loaded for employees.";
 }
 
 function generateShiftTestingData() {
@@ -182,15 +182,15 @@ function generateShiftTestingData() {
 
   baseTemplates.forEach(template => addShiftTemplateRow(template));
 
-  byId("workBusinessStart").value = "09:00";
-  byId("workBusinessEnd").value = hasWeekendCoverage ? "21:00" : "20:00";
-  byId("workMessage").textContent = "Testing data loaded for shift details.";
+  getElementById("workBusinessStart").value = "09:00";
+  getElementById("workBusinessEnd").value = hasWeekendCoverage ? "21:00" : "20:00";
+  getElementById("workMessage").textContent = "Testing data loaded for shift details.";
 }
 
 function addEmployeeRow(defaultData = {}) {
-  const employeeList = byId("employeeList");
-  const rowId = `workEmployee${workEmployeeIdCounter}`;
-  workEmployeeIdCounter += 1;
+  const employeeList = getElementById("employeeList");
+  const rowId = `workEmployee${employeeRowIdCounter}`;
+  employeeRowIdCounter += 1;
 
   const selectedDays = new Set(defaultData.days || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const rowBox = document.createElement("section");
@@ -222,7 +222,7 @@ function addEmployeeRow(defaultData = {}) {
     </div>
     <div class="work-days-row">
       <span>Availability Days</span>
-      <div class="work-day-chips">${makeWorkDayChips(selectedDays)}</div>
+      <div class="work-day-chips">${buildWorkDayChipButtons(selectedDays)}</div>
       <button type="button" class="btn-main work-remove-btn">Remove</button>
     </div>
   `;
@@ -262,9 +262,9 @@ function parseEmployeeRows() {
 }
 
 function addShiftTemplateRow(defaultData = {}) {
-  const list = byId("shiftTemplateList");
-  const rowId = `shiftTemplate${shiftTemplateIdCounter}`;
-  shiftTemplateIdCounter += 1;
+  const list = getElementById("shiftTemplateList");
+  const rowId = `shiftTemplate${templateRowIdCounter}`;
+  templateRowIdCounter += 1;
 
   const row = document.createElement("section");
   row.className = "shift-template-row";
@@ -345,8 +345,8 @@ function expandShiftTemplatesToRequirements(templates) {
 }
 
 function parseGlobalRules() {
-  const businessStart = parseTimeInputToMinutes(byId("workBusinessStart").value);
-  const businessEnd = parseTimeInputToMinutes(byId("workBusinessEnd").value);
+  const businessStart = parseTimeInputToMinutes(getElementById("workBusinessStart").value);
+  const businessEnd = parseTimeInputToMinutes(getElementById("workBusinessEnd").value);
   const slotSize = 60;
   // Internal defaults after removing UI controls: keep shifts long and realistic.
   const minShiftHours = 4;
@@ -361,7 +361,7 @@ function parseGlobalRules() {
   };
 }
 
-function initializeNeedByDay(slotStartsByDay) {
+function createNeedGrid(slotStartsByDay) {
   const needByDay = {};
   allCalendarDays.forEach(dayName => {
     needByDay[dayName] = slotStartsByDay[dayName].map(() => 0);
@@ -369,7 +369,7 @@ function initializeNeedByDay(slotStartsByDay) {
   return needByDay;
 }
 
-function buildSlotStartsByDay(businessStart, businessEnd, slotSize) {
+function createSlotStartsByDay(businessStart, businessEnd, slotSize) {
   const slotStartsByDay = {};
   allCalendarDays.forEach(dayName => {
     slotStartsByDay[dayName] = [];
@@ -380,7 +380,7 @@ function buildSlotStartsByDay(businessStart, businessEnd, slotSize) {
   return slotStartsByDay;
 }
 
-function applyStaffingNeeds(needByDay, requirements, slotStartsByDay, slotSize) {
+function applyShiftTemplateNeeds(needByDay, requirements, slotStartsByDay, slotSize) {
   requirements.forEach(requirement => {
     const slots = needByDay[requirement.day];
     const starts = slotStartsByDay[requirement.day];
@@ -397,21 +397,21 @@ function applyStaffingNeeds(needByDay, requirements, slotStartsByDay, slotSize) 
   });
 }
 
-function isEmployeeAvailableForSlot(employee, dayName, slotStart, slotEnd) {
+function isEmployeeAvailableForShiftSlot(employee, dayName, slotStart, slotEnd) {
   if (!employee.selectedDays.includes(dayName)) {
     return false;
   }
   return slotStart >= employee.startMinutes && slotEnd <= employee.endMinutes;
 }
 
-function employeeAssignedInSlot(assignmentsByDay, dayName, slotIndex, employeeName) {
+function isEmployeeAssignedInSlot(assignmentsByDay, dayName, slotIndex, employeeName) {
   return assignmentsByDay[dayName][slotIndex].includes(employeeName);
 }
 
 function countTrailingAssignedSlots(assignmentsByDay, dayName, slotIndex, employeeName) {
   let streak = 0;
   for (let index = slotIndex - 1; index >= 0; index -= 1) {
-    if (!employeeAssignedInSlot(assignmentsByDay, dayName, index, employeeName)) {
+    if (!isEmployeeAssignedInSlot(assignmentsByDay, dayName, index, employeeName)) {
       break;
     }
     streak += 1;
@@ -421,7 +421,7 @@ function countTrailingAssignedSlots(assignmentsByDay, dayName, slotIndex, employ
 
 function hasAssignedEarlierSlot(assignmentsByDay, dayName, slotIndex, employeeName) {
   for (let index = 0; index < slotIndex; index += 1) {
-    if (employeeAssignedInSlot(assignmentsByDay, dayName, index, employeeName)) {
+    if (isEmployeeAssignedInSlot(assignmentsByDay, dayName, index, employeeName)) {
       return true;
     }
   }
@@ -433,7 +433,7 @@ function countFutureAvailableSlots(employee, dayName, slotStarts, fromIndex, slo
   for (let index = fromIndex; index < slotStarts.length && count < maxSlots; index += 1) {
     const slotStart = slotStarts[index];
     const slotEnd = slotStart + slotSize;
-    if (!isEmployeeAvailableForSlot(employee, dayName, slotStart, slotEnd)) {
+    if (!isEmployeeAvailableForShiftSlot(employee, dayName, slotStart, slotEnd)) {
       break;
     }
     count += 1;
@@ -452,7 +452,7 @@ function countFutureNeededSlots(needSlots, fromIndex, maxSlots) {
   return count;
 }
 
-function selectCandidatesForSlot({
+function selectShiftCandidatesForSlot({
   employees,
   dayName,
   slotIndex,
@@ -576,14 +576,14 @@ function buildShiftsFromAssignments(employees, assignmentsByDay, slotStartsByDay
         const start = slotStarts[segmentStartIndex];
         const end = slotStarts[segmentEndIndex] + slotSize;
         shifts.push({
-          shiftId: nextShiftId,
+          shiftId: nextGeneratedShiftId,
           employeeName: employee.name,
           day: dayName,
           start,
           end,
-          eventColor: employeeColorMap.get(employee.name)
+          eventColor: employeeColorByName.get(employee.name)
         });
-        nextShiftId += 1;
+        nextGeneratedShiftId += 1;
       }
     });
   });
@@ -633,7 +633,7 @@ function groupShiftsByEmployeeDay(shifts) {
 }
 
 function renderTotals(shifts) {
-  const totalsBox = byId("workTotals");
+  const totalsBox = getElementById("workTotals");
   if (!shifts.length) {
     totalsBox.hidden = true;
     totalsBox.innerHTML = "";
@@ -659,7 +659,7 @@ function renderTotals(shifts) {
 }
 
 function renderCoverage(coverageRows) {
-  const coverageBox = byId("staffingCoverage");
+  const coverageBox = getElementById("staffingCoverage");
   if (!coverageRows.length) {
     coverageBox.hidden = true;
     coverageBox.innerHTML = "";
@@ -710,16 +710,16 @@ function printWorkSchedule() {
 function renderSchedule() {
   const scheduleGrid = byId("scheduleGrid");
   scheduleGrid.innerHTML = "";
-  byId("staffingCoverage").hidden = true;
-  byId("workTotals").hidden = true;
+  getElementById("staffingCoverage").hidden = true;
+  getElementById("workTotals").hidden = true;
 
-  if (!generatedEmployees.length) {
+  if (!generatedEmployeeList.length) {
     return;
   }
 
-  const shiftsByEmployeeDay = groupShiftsByEmployeeDay(generatedShifts);
-  const hasSaturdayShift = generatedShifts.some(shift => shift.day === "Sat");
-  const hasSundayShift = generatedShifts.some(shift => shift.day === "Sun");
+  const shiftsByEmployeeDay = groupShiftsByEmployeeAndDay(generatedShiftList);
+  const hasSaturdayShift = generatedShiftList.some(shift => shift.day === "Sat");
+  const hasSundayShift = generatedShiftList.some(shift => shift.day === "Sun");
   const visibleDays = allCalendarDays.filter(dayName => {
     if (dayName === "Sat") {
       return hasSaturdayShift;
@@ -734,7 +734,7 @@ function renderSchedule() {
     return;
   }
   const minutesByEmployee = new Map();
-  generatedShifts.forEach(shift => {
+  generatedShiftList.forEach(shift => {
     const minutes = Math.max(0, shift.end - shift.start);
     minutesByEmployee.set(shift.employeeName, (minutesByEmployee.get(shift.employeeName) || 0) + minutes);
   });
@@ -755,24 +755,24 @@ function renderSchedule() {
 
   const actions = document.createElement("div");
   actions.className = "work-roster-actions";
-  const printBtn = document.createElement("button");
-  printBtn.type = "button";
-  printBtn.className = "btn-main work-roster-btn work-link-btn";
-  printBtn.textContent = "Print Schedule";
-  printBtn.addEventListener("click", printWorkSchedule);
-  const updateBtn = document.createElement("button");
-  updateBtn.type = "button";
-  updateBtn.className = "btn-main work-roster-btn work-link-btn";
-  updateBtn.textContent = "Update";
-  updateBtn.addEventListener("click", runWorkScheduleGeneration);
-  actions.appendChild(printBtn);
-  actions.appendChild(updateBtn);
+  const printButton = document.createElement("button");
+  printButton.type = "button";
+  printButton.className = "btn-main work-roster-btn work-link-btn";
+  printButton.textContent = "Print Schedule";
+  printButton.addEventListener("click", printWorkSchedule);
+  const updateButton = document.createElement("button");
+  updateButton.type = "button";
+  updateButton.className = "btn-main work-roster-btn work-link-btn";
+  updateButton.textContent = "Update";
+  updateButton.addEventListener("click", generateWorkSchedule);
+  actions.appendChild(printButton);
+  actions.appendChild(updateButton);
   topBar.appendChild(actions);
   scheduleGrid.appendChild(topBar);
 
   const coverageByDay = {};
   allCalendarDays.forEach(dayName => {
-    coverageByDay[dayName] = generatedCoverage
+    coverageByDay[dayName] = generatedCoverageList
       .filter(item => item.day === dayName)
       .sort((a, b) => a.start - b.start);
   });
@@ -844,7 +844,7 @@ function renderSchedule() {
   });
   table.appendChild(headerRow);
 
-  generatedEmployees.forEach(employee => {
+  generatedEmployeeList.forEach(employee => {
     const row = document.createElement("div");
     row.className = "work-roster-row";
 
@@ -854,7 +854,7 @@ function renderSchedule() {
     const maxHoursText = Number.isFinite(employee.maxWeeklyHours) ? employee.maxWeeklyHours : "?";
     nameCell.innerHTML = `
       <div class="work-employee-name-line">
-        <span class="work-employee-dot" style="background:${employeeColorMap.get(employee.name)}"></span>
+        <span class="work-employee-dot" style="background:${employeeColorByName.get(employee.name)}"></span>
         <strong>${employee.name}</strong>
       </div>
       <small>${workedHours.toFixed(0)} / ${maxHoursText} hrs</small>
@@ -924,11 +924,11 @@ function renderSchedule() {
   scheduleGrid.appendChild(table);
 }
 
-function runWorkScheduleGeneration() {
-  const employees = parseEmployeeRows();
-  const templates = parseShiftTemplateRows();
-  const requirements = expandShiftTemplatesToRequirements(templates);
-  const rules = parseGlobalRules();
+function generateWorkSchedule() {
+  const employees = readEmployeeRows();
+  const templates = readShiftTemplateRows();
+  const requirements = expandShiftTemplatesIntoRequirements(templates);
+  const rules = readScheduleRules();
 
   if (!employees.length) {
     byId("workMessage").textContent = "Add at least one employee.";
@@ -950,7 +950,7 @@ function runWorkScheduleGeneration() {
     return;
   }
 
-  let colorIndex = employeeColorMap.size;
+  let colorIndex = employeeColorByName.size;
   for (const employee of employees) {
     if (!employee.name) {
       byId("workMessage").textContent = "Each employee needs a name.";
@@ -977,8 +977,8 @@ function runWorkScheduleGeneration() {
       return;
     }
 
-    if (!employeeColorMap.has(employee.name)) {
-      employeeColorMap.set(employee.name, presetEventColors[colorIndex % presetEventColors.length]);
+    if (!employeeColorByName.has(employee.name)) {
+      employeeColorByName.set(employee.name, presetEventColors[colorIndex % presetEventColors.length]);
       colorIndex += 1;
     }
   }
@@ -1008,9 +1008,9 @@ function runWorkScheduleGeneration() {
 
   const minShiftSlots = Math.max(1, Math.ceil((rules.minShiftHours * 60) / rules.slotSize));
   const maxShiftSlots = Math.max(minShiftSlots, Math.floor((rules.maxShiftHours * 60) / rules.slotSize));
-  const slotStartsByDay = buildSlotStartsByDay(rules.businessStart, rules.businessEnd, rules.slotSize);
-  const needByDay = initializeNeedByDay(slotStartsByDay);
-  applyStaffingNeeds(needByDay, requirements, slotStartsByDay, rules.slotSize);
+  const slotStartsByDay = createSlotStartsByDay(rules.businessStart, rules.businessEnd, rules.slotSize);
+  const needByDay = createNeedGrid(slotStartsByDay);
+  applyShiftTemplateNeeds(needByDay, requirements, slotStartsByDay, rules.slotSize);
 
   const assignmentsByDay = {};
   allCalendarDays.forEach(dayName => {
@@ -1030,7 +1030,7 @@ function runWorkScheduleGeneration() {
         return;
       }
 
-      const rankedCandidates = selectCandidatesForSlot({
+      const rankedCandidates = selectShiftCandidatesForSlot({
         employees,
         dayName,
         slotIndex,
@@ -1053,54 +1053,54 @@ function runWorkScheduleGeneration() {
     });
   });
 
-  generatedShifts = buildShiftsFromAssignments(employees, assignmentsByDay, slotStartsByDay, rules.slotSize);
-  generatedEmployees = employees;
-  generatedCoverage = buildCoverageSummary(requirements, assignmentsByDay, slotStartsByDay, rules.slotSize);
+  generatedShiftList = buildShiftsFromAssignments(employees, assignmentsByDay, slotStartsByDay, rules.slotSize);
+  generatedEmployeeList = employees;
+  generatedCoverageList = buildCoverageSummary(requirements, assignmentsByDay, slotStartsByDay, rules.slotSize);
 
   const maxedOutCount = employees.filter(employee => {
     const workedMinutes = employeeMinutesWorked.get(employee.name) || 0;
     return workedMinutes >= (employee.maxWeeklyHours * 60);
   }).length;
 
-  const understaffedCount = generatedCoverage.filter(period => period.isUnderstaffed).length;
+  const understaffedCount = generatedCoverageList.filter(period => period.isUnderstaffed).length;
   if (understaffedCount > 0 && maxedOutCount > 0) {
-    byId("workMessage").textContent = "schedule can't be filled completely because not enough people are working, and their hrs have been maxed";
+    getElementById("workMessage").textContent = "schedule can't be filled completely because not enough people are working, and their hrs have been maxed";
   } else if (understaffedCount > 0) {
-    byId("workMessage").textContent = `Generated ${generatedShifts.length} shift(s). ${understaffedCount} template period(s) are understaffed (long-shift rules prevent tiny filler shifts).`;
+    getElementById("workMessage").textContent = `Generated ${generatedShiftList.length} shift(s). ${understaffedCount} template period(s) are understaffed (long-shift rules prevent tiny filler shifts).`;
   } else {
-    byId("workMessage").textContent = `Generated ${generatedShifts.length} shift(s) from shift templates.`;
+    getElementById("workMessage").textContent = `Generated ${generatedShiftList.length} shift(s) from shift templates.`;
   }
   renderSchedule();
 }
 
-byId("addEmployeeBtn").addEventListener("click", () => addEmployeeRow());
-byId("getWorkScheduleBtn").addEventListener("click", runWorkScheduleGeneration);
-byId("workTestingEmployeesBtn").addEventListener("click", () => {
+getElementById("addEmployeeBtn").addEventListener("click", () => addEmployeeRow());
+getElementById("getWorkScheduleBtn").addEventListener("click", generateWorkSchedule);
+getElementById("workTestingEmployeesBtn").addEventListener("click", () => {
   generateEmployeeTestingData();
   generateShiftTestingData();
-  byId("workMessage").textContent = "Testing data loaded for employees and shift details.";
+  getElementById("workMessage").textContent = "Testing data loaded for employees and shift details.";
 });
 
-byId("workNextBtn").addEventListener("click", () => {
+getElementById("workNextBtn").addEventListener("click", () => {
   if (!document.querySelectorAll(".work-employee-row").length) {
-    byId("workMessage").textContent = "Add at least one employee before continuing.";
+    getElementById("workMessage").textContent = "Add at least one employee before continuing.";
     return;
   }
-  byId("workMessage").textContent = "Now add shift templates and generate your schedule.";
-  setWorkStep("templates");
+  getElementById("workMessage").textContent = "Now add shift templates and generate your schedule.";
+  showWorkStep("templates");
 });
 
-byId("workStepEmployeesBtn").addEventListener("click", () => {
-  setWorkStep("employees");
+getElementById("workStepEmployeesBtn").addEventListener("click", () => {
+  showWorkStep("employees");
 });
 
-byId("workStepTemplatesBtn").addEventListener("click", () => {
-  setWorkStep("templates");
+getElementById("workStepTemplatesBtn").addEventListener("click", () => {
+  showWorkStep("templates");
 });
 
 addEmployeeRow();
 
 addShiftTemplateRow();
 
-setWorkStep("employees");
+showWorkStep("employees");
 renderSchedule();

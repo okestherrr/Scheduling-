@@ -158,7 +158,7 @@ let scheduledEventAlerts = [];
 let nextScheduledAlertId = 1;
 let schedulerMode = "course";
 let alertPanelOpen = false;
-let workEmployeeIdCounter = 1;
+let workEmployeeRowIdCounter = 1;
 let activePaletteCloseListener = null;
 let workHoursPanelOpen = false;
 let workHoursEnabled = false;
@@ -2191,8 +2191,8 @@ function makeWorkDayChips(selectedDays = new Set(["Mon", "Tue", "Wed", "Thu", "F
 
 function addEmployeeRow(defaultData = {}) {
   const employeeList = byId("employeeList");
-  const rowId = `workEmployee${workEmployeeIdCounter}`;
-  workEmployeeIdCounter += 1;
+  const rowId = `workEmployee${workEmployeeRowIdCounter}`;
+  workEmployeeRowIdCounter += 1;
 
   const selectedDays = new Set(defaultData.days || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const rowBox = document.createElement("section");
