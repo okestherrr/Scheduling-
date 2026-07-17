@@ -14,20 +14,63 @@
       </div>
 
       <section class="hero" id="workHero">
-        <h1>Work Scheduler</h1>
-        <p>Enter employees, availability, and preferred weekly hours.</p>
-        <div id="employeeList"></div>
-        <div class="request-row work-actions-row">
-          <button id="addEmployeeBtn" class="btn-main" type="button">Add Another Employee</button>
-          <button id="getWorkScheduleBtn" class="btn-main" type="button">Get Schedule</button>
+        <div class="work-title-row">
+          <h1>Work Scheduler</h1>
+          <button id="workTestingEmployeesBtn" class="btn-main" type="button">Testing</button>
         </div>
+        <p>First add employees and then add shift details</p>
+
+        <div class="work-step-tabs">
+          <button id="workStepEmployeesBtn" class="btn-main work-step-btn active" type="button">Add Employees</button>
+          <button id="workStepTemplatesBtn" class="btn-main work-step-btn" type="button">Shift Details</button>
+        </div>
+
+        <section id="workEmployeeStep">
+          <div id="employeeList"></div>
+          <div class="request-row work-actions-row">
+            <button id="addEmployeeBtn" class="btn-main" type="button">Add Employee</button>
+            <button id="workNextBtn" class="btn-main" type="button">Next</button>
+          </div>
+        </section>
+
+        <section id="workTemplateStep" hidden>
+          <section class="work-constraints-panel">
+            <h3>Work Details</h3>
+            <div class="work-constraints-grid">
+              <label class="calendar-options-field" for="workBusinessStart">
+                <span>Shifts start:</span>
+                <input id="workBusinessStart" type="time" step="60" />
+              </label>
+              <label class="calendar-options-field" for="workBusinessEnd">
+                <span>Shifts end:</span>
+                <input id="workBusinessEnd" type="time" step="60" />
+              </label>
+            </div>
+          </section>
+
+          <section class="work-staffing-panel">
+            <div class="work-panel-title-row">
+              <h3>Shift Details</h3>
+            </div>
+            <p class="work-staffing-copy">Example: Morning 9:00 AM-1:00 PM needs 2 employees, Afternoon 1:00 PM-5:00 PM needs 3 employees.</p>
+            <div id="shiftTemplateList"></div>
+          </section>
+
+          <div class="request-row work-actions-row">
+            <button id="workBackBtn" class="btn-main" type="button">Back</button>
+            <button id="getWorkScheduleBtn" class="btn-main" type="button">Get Schedule</button>
+            <button id="updateWorkScheduleBtn" class="btn-main" type="button">Update Schedule</button>
+          </div>
+        </section>
+
         <p id="workMessage"></p>
       </section>
 
       <section class="results-panel">
-        <h2>Scheduled Shifts</h2>
+        <h2>Shifts:</h2>
         <p id="requestMessage"></p>
         <div id="scheduleGrid"></div>
+        <div id="staffingCoverage" class="work-coverage-panel" hidden></div>
         <div id="workTotals" class="work-totals-panel" hidden></div>
       </section>
     </main>

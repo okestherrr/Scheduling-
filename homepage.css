@@ -91,6 +91,41 @@ a.mode-switch-btn {
   margin-bottom: 10px;
 }
 
+.work-step-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 12px;
+  flex-wrap: wrap;
+}
+
+.work-step-btn {
+  background: #e7f8fd;
+  color: #0d6074;
+}
+
+.work-step-btn.active {
+  background: #0f6f88;
+  color: #ffffff;
+}
+
+.work-title-row,
+.work-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.work-title-row h1,
+.work-panel-title-row h3 {
+  margin: 0;
+}
+
+.work-title-row .btn-main,
+.work-panel-title-row .btn-main {
+  width: auto;
+}
+
 .work-employee-row {
   border: 1px solid #b8d8df;
   background: #f6fdff;
@@ -104,8 +139,64 @@ a.mode-switch-btn {
 
 .work-employee-fields {
   display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 8px;
+}
+
+.work-constraints-panel,
+.work-staffing-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #b8d8df;
+  background: #f6fdff;
+}
+
+.work-constraints-panel h3,
+.work-staffing-panel h3,
+.work-coverage-panel h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: #1a4a57;
+}
+
+.work-constraints-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.work-staffing-copy {
+  margin: 0 0 8px;
+  color: var(--soft-text);
+  font-size: 0.9rem;
+}
+
+#shiftTemplateList {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.shift-template-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) repeat(4, minmax(120px, 1fr)) auto;
+  gap: 8px;
+  align-items: end;
+  border: 1px solid #d3e5ea;
+  background: #f9fdff;
+  padding: 8px;
+}
+
+.template-remove-btn {
+  min-width: 64px;
+}
+
+.calendar-options-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #a8cdd8;
+  background: #ffffff;
 }
 
 .work-days-row {
@@ -159,6 +250,331 @@ a.mode-switch-btn {
   padding: 12px;
   border: 1px solid #b8d8df;
   background: #f5fcff;
+}
+
+.work-coverage-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #b8d8df;
+  background: #f5fcff;
+}
+
+.work-coverage-list {
+  display: grid;
+  gap: 8px;
+}
+
+.work-coverage-row {
+  border: 1px solid #d3e5ea;
+  background: #f9fdff;
+  padding: 8px;
+}
+
+.work-coverage-row.understaffed {
+  border-color: #d98d8d;
+  background: #fff3f3;
+}
+
+.work-coverage-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.work-coverage-assigned {
+  color: #274651;
+  font-size: 0.92rem;
+}
+
+.work-roster-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+.work-roster-title-wrap h3 {
+  margin: 0;
+  font-size: 1.9rem;
+  color: #20374b;
+}
+
+.work-roster-title-wrap p {
+  margin: 2px 0 0;
+  color: #577080;
+  font-weight: 600;
+}
+
+.work-roster-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.work-roster-btn {
+  border: 1px solid #bfd2dd !important;
+  background: #ffffff !important;
+  color: #244254 !important;
+  padding: 8px 12px;
+}
+
+.work-roster-btn.publish {
+  background: #0f7d97 !important;
+  border-color: #0f7d97 !important;
+  color: #fff !important;
+}
+
+.work-staffing-strip {
+  display: grid;
+  grid-template-columns: 170px repeat(var(--work-day-columns, 7), minmax(120px, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d2e0e8;
+  background: #f8fbfd;
+  margin-bottom: 12px;
+}
+
+.work-staffing-info {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  color: #506879;
+}
+
+.work-staffing-info strong {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.work-staffing-info small {
+  font-size: 0.75rem;
+}
+
+.work-staffing-day-card {
+  border: 1px solid #d6e4eb;
+  background: #ffffff;
+  padding: 6px;
+  display: grid;
+  gap: 5px;
+}
+
+.work-staffing-day-card h4 {
+  margin: 0 0 2px;
+  font-size: 0.84rem;
+  color: #20374b;
+}
+
+.work-staffing-chip {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #cfe0cb;
+  background: #e9f5e2;
+  color: #2f5b2f;
+  padding: 4px 6px;
+}
+
+.work-staffing-chip.understaffed {
+  border-color: #edc6c6;
+  background: #faecec;
+  color: #7f3737;
+}
+
+.work-staffing-chip.empty {
+  justify-content: center;
+  border-color: #d8e3e8;
+  background: #f7fafc;
+  color: #6f8592;
+}
+
+.work-roster-grid {
+  min-width: 980px;
+  border: 1px solid #d0dee7;
+  background: #fff;
+}
+
+.work-roster-row {
+  display: grid;
+  grid-template-columns: 180px repeat(var(--work-day-columns, 7), minmax(110px, 1fr));
+}
+
+.work-roster-header {
+  background: #f6f9fc;
+}
+
+.work-roster-cell {
+  border-right: 1px solid #dce6ed;
+  border-bottom: 1px solid #dce6ed;
+  padding: 8px;
+  min-height: 52px;
+}
+
+.work-roster-row .work-roster-cell:last-child,
+.work-roster-header .work-roster-cell:last-child {
+  border-right: none;
+}
+
+.employee-cell {
+  background: #f9fcff;
+}
+
+.employee-cell small {
+  color: #6e8493;
+  font-size: 0.78rem;
+}
+
+.work-employee-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.work-employee-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.work-master-grid {
+  min-width: 860px;
+  border: 1px solid #c7d9df;
+}
+
+.work-master-row {
+  display: grid;
+  grid-template-columns: 180px repeat(7, minmax(96px, 1fr));
+}
+
+.work-master-header {
+  background: #edf7fb;
+  font-weight: 700;
+}
+
+.work-master-cell {
+  border-right: 1px solid #d5e4ea;
+  border-bottom: 1px solid #d5e4ea;
+  padding: 8px;
+  min-height: 52px;
+}
+
+.work-master-row .work-master-cell:last-child,
+.work-master-header .work-master-cell:last-child {
+  border-right: none;
+}
+
+.employee-cell {
+  background: #f7fcff;
+}
+
+.day-cell {
+  text-align: center;
+  padding-bottom: 6px;
+}
+
+.work-day-title {
+  font-weight: 700;
+}
+
+.work-day-major-markers {
+  position: relative;
+  height: 18px;
+  margin-top: 4px;
+}
+
+.work-day-major-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.64rem;
+  color: #49636d;
+  white-space: nowrap;
+}
+
+.schedule-cell {
+  background: #ffffff;
+  padding: 0;
+}
+
+.work-shift-pill {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  padding: 4px 6px;
+  border-left: 3px solid rgba(0, 0, 0, 0.18);
+}
+
+.work-off-label {
+  color: #6a7f88;
+  font-size: 0.82rem;
+}
+
+.work-cell-timeline {
+  position: relative;
+  min-height: 66px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.work-hour-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #dce7ed;
+}
+
+.work-shift-bar {
+  position: absolute;
+  top: 14px;
+  height: 24px;
+  border: none;
+  border-radius: 0 !important;
+  text-align: center;
+  padding: 4px 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #2b2b2b;
+  cursor: default;
+}
+
+.work-shift-bar:hover {
+  filter: none;
+}
+
+.work-break-bar {
+  position: absolute;
+  top: 44px;
+  height: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.work-break-bar.short-break {
+  background: #fff066;
+}
+
+.work-break-bar.lunch {
+  background: #ffcb8a;
+}
+
+.work-cell-timeline .work-off-label {
+  position: absolute;
+  left: 50%;
+  top: 25px;
+  transform: translateX(-50%);
+  font-size: 1rem;
+  color: #81949c;
+}
+
+#staffingCoverage,
+#workTotals {
+  display: none !important;
 }
 
 .work-totals-panel h3 {
@@ -1253,6 +1669,22 @@ h2 {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
 
+  .work-constraints-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .shift-template-row {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .work-master-row {
+    grid-template-columns: 150px repeat(7, minmax(90px, 1fr));
+  }
+
+  .work-shift-bar {
+    font-size: 0.7rem;
+  }
+
   .calendar-event-alert-row {
     grid-template-columns: 1fr;
   }
@@ -1383,6 +1815,24 @@ button,
     grid-template-columns: 1fr;
   }
 
+  .work-constraints-grid,
+  .shift-template-row {
+    grid-template-columns: 1fr;
+  }
+
+  .work-cell-timeline {
+    min-height: 64px;
+  }
+
+  .work-shift-bar {
+    top: 10px;
+    height: 24px;
+  }
+
+  .work-break-bar {
+    top: 39px;
+  }
+
   .settings-row {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -1507,13 +1957,48 @@ button,
     display: none !important;
   }
 
+  body.print-calendar-only .work-step-tabs,
+  body.print-calendar-only #workEmployeeStep,
+  body.print-calendar-only #workTemplateStep,
+  body.print-calendar-only #workMessage,
+  body.print-calendar-only #requestMessage,
+  body.print-calendar-only .work-roster-actions,
+  body.print-calendar-only #staffingCoverage,
+  body.print-calendar-only #workTotals,
+  body.print-calendar-only .top-home-row {
+    display: none !important;
+  }
+
   body.print-calendar-only .calendar-board {
     transform-origin: top left;
     zoom: 0.88;
   }
 
+  body.print-calendar-only .work-roster-grid {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  body.print-calendar-only .work-roster-row {
+    grid-template-columns: 160px repeat(var(--work-day-columns, 7), minmax(0, 1fr)) !important;
+  }
+
+  body.print-calendar-only .work-staffing-strip {
+    grid-template-columns: 160px repeat(var(--work-day-columns, 7), minmax(0, 1fr)) !important;
+  }
+
+  body.print-calendar-only .work-shift-bar,
+  body.print-calendar-only .work-staffing-chip,
+  body.print-calendar-only .work-roster-cell,
+  body.print-calendar-only .work-staffing-day-card,
+  body.print-calendar-only .work-staffing-strip,
+  body.print-calendar-only .work-roster-grid {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   @page {
     margin: 0.35in;
-    size: portrait;
+    size: landscape;
   }
 }
