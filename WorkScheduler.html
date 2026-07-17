@@ -16,19 +16,19 @@
       <section class="hero" id="workHero">
         <div class="work-title-row">
           <h1>Work Scheduler</h1>
-          <button id="workTestingEmployeesBtn" class="btn-main" type="button">Testing</button>
+          <button id="workTestingEmployeesBtn" class="btn-main work-link-btn" type="button">Testing</button>
         </div>
-        <p>First add employees and then add shift details</p>
+        <p>First add employees and add shift details then push get schedule.</p>
 
         <div class="work-step-tabs">
-          <button id="workStepEmployeesBtn" class="btn-main work-step-btn active" type="button">Add Employees</button>
+          <button id="workStepEmployeesBtn" class="btn-main work-step-btn active" type="button">Employees Details</button>
           <button id="workStepTemplatesBtn" class="btn-main work-step-btn" type="button">Shift Details</button>
         </div>
 
         <section id="workEmployeeStep">
           <div id="employeeList"></div>
           <div class="request-row work-actions-row">
-            <button id="addEmployeeBtn" class="btn-main" type="button">Add Employee</button>
+            <button id="addEmployeeBtn" class="btn-main work-link-btn" type="button">Add person</button>
             <button id="workNextBtn" class="btn-main" type="button">Next</button>
           </div>
         </section>
@@ -56,10 +56,8 @@
             <div id="shiftTemplateList"></div>
           </section>
 
-          <div class="request-row work-actions-row">
-            <button id="workBackBtn" class="btn-main" type="button">Back</button>
+          <div class="request-row work-actions-row work-template-actions-row">
             <button id="getWorkScheduleBtn" class="btn-main" type="button">Get Schedule</button>
-            <button id="updateWorkScheduleBtn" class="btn-main" type="button">Update Schedule</button>
           </div>
         </section>
 
@@ -67,8 +65,6 @@
       </section>
 
       <section class="results-panel">
-        <h2>Shifts:</h2>
-        <p id="requestMessage"></p>
         <div id="scheduleGrid"></div>
         <div id="staffingCoverage" class="work-coverage-panel" hidden></div>
         <div id="workTotals" class="work-totals-panel" hidden></div>

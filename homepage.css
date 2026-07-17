@@ -231,8 +231,8 @@ a.mode-switch-btn {
   justify-self: start;
   background: transparent !important;
   border: none !important;
-  color: #0d6074;
-  padding: 0;
+  color: #1a4a57 !important;
+  padding: 0 2px !important;
 }
 
 .work-remove-btn:hover {
@@ -321,10 +321,16 @@ a.mode-switch-btn {
   padding: 8px 12px;
 }
 
-.work-roster-btn.publish {
-  background: #0f7d97 !important;
-  border-color: #0f7d97 !important;
-  color: #fff !important;
+.work-link-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #1a4a57 !important;
+  padding: 0 2px !important;
+}
+
+.work-link-btn:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .work-staffing-strip {
@@ -704,6 +710,10 @@ a.mode-switch-btn {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
+}
+
+.work-template-actions-row {
+  justify-content: flex-end;
 }
 
 .course-request-row {

@@ -81,25 +81,6 @@ function minutesToHourAmPm(totalMinutes) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
-function formatDateShort(dateValue) {
-  const month = dateValue.getMonth() + 1;
-  const day = dateValue.getDate();
-  return `${month}/${day}`;
-}
-
-function getWeekDatesFromToday() {
-  const now = new Date();
-  const dayIndex = now.getDay();
-  const mondayOffset = dayIndex === 0 ? -6 : 1 - dayIndex;
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
-
-  const dates = [];
-  for (let i = 0; i < allCalendarDays.length; i += 1) {
-    dates.push(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i));
-  }
-  return dates;
-}
-
 function makeWorkDayChips(selectedDays = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"])) {
   return allCalendarDays.map(dayName => {
     const isSelected = selectedDays.has(dayName);
@@ -513,6 +494,8 @@ function selectCandidatesForSlot({
       return;
     }
 
+    const mustContinueToMeetMinimum = continuingShift && nextShiftSize < minShiftSlots;
+
     // Do not start a new shift if the employee cannot fit at least
     // the minimum shift length before hitting weekly max hours.
     if (!continuingShift) {
@@ -536,6 +519,7 @@ function selectCandidatesForSlot({
       workedMinutes,
       remainingPreferred,
       continuingShift,
+      mustContinueToMeetMinimum,
       shiftCanMeetMinimum
     };
 
@@ -545,6 +529,10 @@ function selectCandidatesForSlot({
   });
 
   const byPriority = (a, b) => {
+    // First, preserve in-progress shifts until they satisfy the minimum length.
+    if (a.mustContinueToMeetMinimum !== b.mustContinueToMeetMinimum) {
+      return a.mustContinueToMeetMinimum ? -1 : 1;
+    }
     // Keep existing shifts continuous before opening new starts.
     if (a.continuingShift !== b.continuingShift) {
       return a.continuingShift ? -1 : 1;
@@ -719,10 +707,6 @@ function printWorkSchedule() {
   }, 250);
 }
 
-function publishWorkSchedule() {
-  byId("workMessage").textContent = "Schedule published.";
-}
-
 function renderSchedule() {
   const scheduleGrid = byId("scheduleGrid");
   scheduleGrid.innerHTML = "";
@@ -762,38 +746,27 @@ function renderSchedule() {
   const timelineEnd = Math.ceil(windowEnd / 60) * 60;
   const timelineMinutes = Math.max(60, timelineEnd - timelineStart);
   const majorMarkerInterval = 180;
-  const weekDates = getWeekDatesFromToday();
-  const weekDateByDay = new Map(allCalendarDays.map((dayName, index) => [dayName, weekDates[index]]));
-  const startLabel = formatDateShort(weekDates[0]);
-  const endLabel = formatDateShort(weekDates[weekDates.length - 1]);
-
   const topBar = document.createElement("div");
   topBar.className = "work-roster-topbar";
   const titleWrap = document.createElement("div");
   titleWrap.className = "work-roster-title-wrap";
-  titleWrap.innerHTML = `<h3>Staff Schedule</h3><p>${startLabel} - ${endLabel}</p>`;
+  titleWrap.innerHTML = "<h3>Staff Schedule</h3>";
   topBar.appendChild(titleWrap);
 
   const actions = document.createElement("div");
   actions.className = "work-roster-actions";
   const printBtn = document.createElement("button");
   printBtn.type = "button";
-  printBtn.className = "btn-main work-roster-btn";
+  printBtn.className = "btn-main work-roster-btn work-link-btn";
   printBtn.textContent = "Print Schedule";
   printBtn.addEventListener("click", printWorkSchedule);
-  const publishBtn = document.createElement("button");
-  publishBtn.type = "button";
-  publishBtn.className = "btn-main work-roster-btn publish";
-  publishBtn.textContent = "Publish Schedule";
-  publishBtn.addEventListener("click", publishWorkSchedule);
   const updateBtn = document.createElement("button");
   updateBtn.type = "button";
-  updateBtn.className = "btn-main work-roster-btn";
+  updateBtn.className = "btn-main work-roster-btn work-link-btn";
   updateBtn.textContent = "Update";
   updateBtn.addEventListener("click", runWorkScheduleGeneration);
   actions.appendChild(printBtn);
   actions.appendChild(updateBtn);
-  actions.appendChild(publishBtn);
   topBar.appendChild(actions);
   scheduleGrid.appendChild(topBar);
 
@@ -816,8 +789,7 @@ function renderSchedule() {
   visibleDays.forEach(dayName => {
     const dayCard = document.createElement("div");
     dayCard.className = "work-staffing-day-card";
-    const dayDate = weekDateByDay.get(dayName);
-    dayCard.innerHTML = `<h4>${dayName} ${formatDateShort(dayDate)}</h4>`;
+    dayCard.innerHTML = `<h4>${dayName}</h4>`;
 
     coverageByDay[dayName].forEach(period => {
       const chip = document.createElement("div");
@@ -854,8 +826,7 @@ function renderSchedule() {
 
     const dayTitle = document.createElement("div");
     dayTitle.className = "work-day-title";
-    const dayDate = weekDateByDay.get(dayName);
-    dayTitle.textContent = `${dayName} ${formatDateShort(dayDate)}`;
+    dayTitle.textContent = dayName;
     dayCell.appendChild(dayTitle);
 
     const markerRow = document.createElement("div");
@@ -1099,13 +1070,11 @@ function runWorkScheduleGeneration() {
   } else {
     byId("workMessage").textContent = `Generated ${generatedShifts.length} shift(s) from shift templates.`;
   }
-  byId("requestMessage").textContent = "Staff schedule ready.";
   renderSchedule();
 }
 
 byId("addEmployeeBtn").addEventListener("click", () => addEmployeeRow());
 byId("getWorkScheduleBtn").addEventListener("click", runWorkScheduleGeneration);
-byId("updateWorkScheduleBtn").addEventListener("click", runWorkScheduleGeneration);
 byId("workTestingEmployeesBtn").addEventListener("click", () => {
   generateEmployeeTestingData();
   generateShiftTestingData();
@@ -1119,10 +1088,6 @@ byId("workNextBtn").addEventListener("click", () => {
   }
   byId("workMessage").textContent = "Now add shift templates and generate your schedule.";
   setWorkStep("templates");
-});
-
-byId("workBackBtn").addEventListener("click", () => {
-  setWorkStep("employees");
 });
 
 byId("workStepEmployeesBtn").addEventListener("click", () => {
