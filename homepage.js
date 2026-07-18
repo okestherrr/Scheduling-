@@ -1,4 +1,4 @@
-const firebaseSettings = {
+﻿const firebaseSettings = {
   apiKey: "YOUR_API_KEY",
   authDomain: "class-scheduler.firebaseapp.com",
   projectId: "class-scheduler",
@@ -33,86 +33,102 @@ const presetEventColors = [
   "#D7CCC8", "#8D6E63"
 ];
 
+// quick note: this function handles g et ap iu rl s.
 function getApiUrls(pathSuffix) {
-  const urlList = [];
-  const safePath = pathSuffix.startsWith("/") ? pathSuffix : `/${pathSuffix}`;
+  const urls = [];
+  const path = pathSuffix.startsWith("/") ? pathSuffix : `/${pathSuffix}`;
+
+  // quick note: this function handles a dd ur l.
+  function addUrl(url) {
+    if (!urls.includes(url)) {
+      urls.push(url);
+    }
+  }
 
   if (hasCustomApiUrl) {
-    urlList.push(`${apiBaseText.replace(/\/$/, "")}${safePath}`);
+    addUrl(`${apiBaseText.replace(/\/$/, "")}${path}`);
   }
 
   if (window.location.origin && window.location.origin.startsWith("http")) {
-    urlList.push(`${window.location.origin.replace(/\/$/, "")}${safePath}`);
+    addUrl(`${window.location.origin.replace(/\/$/, "")}${path}`);
   }
 
-  urlList.push(`http://127.0.0.1:5000${safePath}`);
-  urlList.push(`http://localhost:5000${safePath}`);
+  addUrl(`http://127.0.0.1:5000${path}`);
+  addUrl(`http://localhost:5000${path}`);
 
-  if (safePath === "/schedule") {
-    urlList.push(scheduleUrl);
+  if (path === "/schedule") {
+    addUrl(scheduleUrl);
   }
 
-  if (safePath === "/teachers/search") {
-    urlList.push(teacherSearchUrl);
+  if (path === "/teachers/search") {
+    addUrl(teacherSearchUrl);
   }
 
-  return [...new Set(urlList)];
+  return urls;
 }
 
 
+// quick note: this function handles s ho ul du se re sp on se.
 function shouldUseResponse(serverResponse) {
-  const contentType = serverResponse.headers.get("content-type") || "";
-  const hasJsonText = contentType.includes("application/json");
+  const typeText = serverResponse.headers.get("content-type") || "";
+  const isJson = typeText.includes("application/json");
 
   if (serverResponse.ok) {
     return true;
   }
 
-  return serverResponse.status === 400 && hasJsonText;
+  if (serverResponse.status === 400 && isJson) {
+    return true;
+  }
+
+  return false;
 }
 
+// quick note: this function handles s en da pi re qu es t.
 async function sendApiRequest(pathSuffix, requestBody) {
-  const urlList = getApiUrls(pathSuffix);
-  let lastConnectionError = null;
-  let lastBadResponse = null;
+  const urls = getApiUrls(pathSuffix);
+  let lastError = null;
+  let lastResponse = null;
 
-  for (const url of urlList) {
+  for (const url of urls) {
     try {
-      const serverResponse = await fetch(url, {
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody)
       });
 
-      if (shouldUseResponse(serverResponse)) {
-        return { response: serverResponse, url };
+      if (shouldUseResponse(response)) {
+        return { response, url };
       }
 
-      lastBadResponse = { response: serverResponse, url };
+      lastResponse = { response, url };
     } catch (error) {
-      lastConnectionError = error;
+      lastError = error;
     }
   }
 
   // If every API attempt failed to connect, prefer that message over
   // unrelated 404/HTML responses from a non-API origin.
-  if (lastConnectionError) {
-    throw lastConnectionError;
+  if (lastError) {
+    throw lastError;
   }
 
-  if (lastBadResponse) {
-    return lastBadResponse;
+  if (lastResponse) {
+    return lastResponse;
   }
 
-  throw lastConnectionError || new Error("Could not connect to any scheduler API endpoint.");
+  throw lastError || new Error("Could not connect to any scheduler API endpoint.");
 }
 
 
+// quick note: this function handles s en ds ch ed ul er eq ue st.
 async function sendScheduleRequest(requestBody) {
   return sendApiRequest("/schedule", requestBody);
 }
 
 
+// quick note: this function handles s en dt ea ch er se ar ch re qu es t.
 async function sendTeacherSearchRequest(requestBody) {
   return sendApiRequest("/teachers/search", requestBody);
 }
@@ -176,14 +192,17 @@ let calendarSettings = {
   showDevotional: false
 };
 
+// quick note: this function handles b yi d.
 function byId(boxId) {
   return document.getElementById(boxId);
 }
 
+// quick note: this function handles g et re su lt sp an el.
 function getResultsPanel() {
   return document.querySelector(".results-panel");
 }
 
+// quick note: this function handles t og gl er es ul ts pa ne l.
 function toggleResultsPanel(isVisible) {
   const panelBox = getResultsPanel();
   if (panelBox) {
@@ -192,6 +211,7 @@ function toggleResultsPanel(isVisible) {
 }
 
 
+// quick note: this function handles t og gl et ea ch er pa ne l.
 function toggleTeacherPanel(isVisible) {
   const panelBox = byId("teacherSearchPanel");
   if (panelBox) {
@@ -200,6 +220,7 @@ function toggleTeacherPanel(isVisible) {
 }
 
 
+// quick note: this function handles t og gl et er mp an el.
 function toggleTermPanel(isVisible) {
   const panelBox = byId("termPanel");
   if (panelBox) {
@@ -208,6 +229,7 @@ function toggleTermPanel(isVisible) {
 }
 
 
+// quick note: this function handles c le ar sc he du le ui.
 function clearScheduleUi() {
   byId("scheduleOptions").textContent = "";
   byId("selectedSections").textContent = "";
@@ -215,6 +237,7 @@ function clearScheduleUi() {
 }
 
 
+// quick note: this function handles t og gl el oa dm or eb tn.
 function toggleLoadMoreBtn(isVisible) {
   const loadMoreButton = byId("loadMoreBtn");
   if (loadMoreButton) {
@@ -223,6 +246,7 @@ function toggleLoadMoreBtn(isVisible) {
 }
 
 
+// quick note: this function handles t og gl em an ip ul at eb tn.
 function toggleManipulateBtn(isVisible) {
   const manipulateButton = byId("manipulateBtn");
   if (manipulateButton) {
@@ -231,6 +255,7 @@ function toggleManipulateBtn(isVisible) {
 }
 
 
+// quick note: this function handles t og gl er es et bt n.
 function toggleResetBtn(isVisible) {
   const resetButton = byId("resetManipulatedBtn");
   if (resetButton) {
@@ -239,6 +264,7 @@ function toggleResetBtn(isVisible) {
 }
 
 
+// quick note: this function handles m ak es ch ed ul es ig na tu re.
 function makeScheduleSignature(scheduleList) {
   return scheduleList
     .map(oneSection => `${oneSection.course_number}:${oneSection.section_number}`)
@@ -247,11 +273,13 @@ function makeScheduleSignature(scheduleList) {
 }
 
 
+// quick note: this function handles i sf av or it es ch ed ul e.
 function isFavoriteSchedule(index) {
   return favoriteIndexes.has(index);
 }
 
 
+// quick note: this function handles h as ht ex t.
 function hashText(textValue) {
   let hashValue = 0;
 
@@ -264,6 +292,7 @@ function hashText(textValue) {
 }
 
 
+// quick note: this function handles g et co ur se pa le tt e.
 function getCoursePalette(courseNumber) {
   const hashValue = hashText(courseNumber);
   const hue = hashValue % 360;
@@ -278,6 +307,7 @@ function getCoursePalette(courseNumber) {
 }
 
 
+// quick note: this function handles a pp ly co ur se co lo rs ty le s.
 function applyCourseColorStyles(targetBox, classItem, options = {}) {
   const palette = getCoursePalette(classItem.course_number);
   const isIdeal = Boolean(classItem.ideal || classItem.is_ideal);
@@ -304,6 +334,7 @@ function applyCourseColorStyles(targetBox, classItem, options = {}) {
 }
 
 
+// quick note: this function handles i sl oc ke ds ec ti on.
 function isLockedSection(classItem) {
   const lockedSection = lockedSectionsByCourse.get(String(classItem.course_number));
   if (!lockedSection) {
@@ -314,6 +345,7 @@ function isLockedSection(classItem) {
 }
 
 
+// quick note: this function handles t og gl el oc ke ds ec ti on.
 function toggleLockedSection(classItem) {
   const courseCode = String(classItem.course_number);
   const sectionCode = String(classItem.section_number);
@@ -328,6 +360,7 @@ function toggleLockedSection(classItem) {
 }
 
 
+// quick note: this function handles g et lo ck ed se ct io ns pa yl oa d.
 function getLockedSectionsPayload() {
   return Array.from(lockedSectionsByCourse.entries()).map(([courseNumber, sectionNumber]) => ({
     course_number: courseNumber,
@@ -336,6 +369,7 @@ function getLockedSectionsPayload() {
 }
 
 
+// quick note: this function handles b ui ld sc he du le re qu es tb od y.
 function buildScheduleRequestBody(startIndex, pageSize, includeLockedSections) {
   const requestBody = {
     courses: [...currentRequest.courses],
@@ -358,6 +392,7 @@ function buildScheduleRequestBody(startIndex, pageSize, includeLockedSections) {
 }
 
 
+// quick note: this function handles r es et sc he du le ui st at e.
 function resetScheduleUiState() {
   hasMoreSchedules = false;
   nextScheduleStartIndex = 0;
@@ -370,25 +405,27 @@ function resetScheduleUiState() {
 }
 
 
+// quick note: this function handles t og gl ef av or it es ch ed ul e.
 function toggleFavoriteSchedule(index) {
-  if (favoriteIndexes.has(index)) {
+  if (!favoriteIndexes.has(index)) {
+    favoriteIndexes.add(index);
+  } else {
     favoriteIndexes.delete(index);
-    return;
   }
-
-  favoriteIndexes.add(index);
 }
 
 
+// quick note: this function handles g et ty pe dc la ss es.
 function getTypedClasses() {
-  const typedText = byId("classRequest").value;
+  const text = byId("classRequest").value;
 
-  return typedText
+  return text
     .split(",")
-    .map(oneClass => oneClass.trim().toUpperCase())
+    .map(classCode => classCode.trim().toUpperCase())
     .filter(Boolean);
 }
 
+// quick note: this function handles g et te rm nu mb er.
 function getTermNumber() {
   const termPanel = byId("termPanel");
   if (!termPanel || termPanel.hidden) {
@@ -408,6 +445,7 @@ function getTermNumber() {
   return termNumber;
 }
 
+// quick note: this function handles t im et ex tt om in ut es.
 function timeTextToMinutes(timeText) {
   if (!timeText || timeText === "NULL") {
     return null;
@@ -424,6 +462,7 @@ function timeTextToMinutes(timeText) {
   return (hourNumber * 60) + minuteNumber;
 }
 
+// quick note: this function handles m in ut es to cl oc k.
 function minutesToClock(totalMinutes) {
   const hour24 = Math.floor(totalMinutes / 60);
   const minute = totalMinutes % 60;
@@ -432,6 +471,7 @@ function minutesToClock(totalMinutes) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${amOrPm}`;
 }
 
+// quick note: this function handles s pl it cl as se sb yd ay.
 function splitClassesByDay(classList) {
   const dayNames = { M: "Mon", T: "Tue", W: "Wed", R: "Thu", F: "Fri", S: "Sat", U: "Sun" };
   const classesByDay = {
@@ -474,6 +514,7 @@ function splitClassesByDay(classList) {
   return classesByDay;
 }
 
+// quick note: this function handles s ho wc ho se nc la ss es.
 function showChosenClasses(classList) {
   const box = byId("selectedSections");
   box.innerHTML = "";
@@ -503,6 +544,7 @@ function showChosenClasses(classList) {
 }
 
 
+// quick note: this function handles p ar se ti me in pu tt om in ut es.
 function parseTimeInputToMinutes(timeText) {
   if (!timeText || !timeText.includes(":")) {
     return null;
@@ -524,6 +566,7 @@ function parseTimeInputToMinutes(timeText) {
 }
 
 
+// quick note: this function handles m in ut es to in pu tt im e.
 function minutesToInputTime(totalMinutes) {
   const safeMinutes = Math.max(0, Math.min(24 * 60 - 1, totalMinutes));
   const hour = Math.floor(safeMinutes / 60);
@@ -532,6 +575,7 @@ function minutesToInputTime(totalMinutes) {
 }
 
 
+// quick note: this function handles g et vi si bl ed ay s.
 function getVisibleDays() {
   if (calendarSettings.weekendMode === "both") {
     return allCalendarDays;
@@ -549,6 +593,7 @@ function getVisibleDays() {
 }
 
 
+// quick note: this function handles b ui ld de vo ti on al cl as si te m.
 function buildDevotionalClassItem() {
   return {
     course_number: "BYUI Devotional",
@@ -566,6 +611,7 @@ function buildDevotionalClassItem() {
 }
 
 
+// quick note: this function handles m ak ec al en da ri nf o.
 function makeCalendarInfo(classList) {
   const classesByDay = splitClassesByDay(classList);
   if (calendarSettings.showDevotional) {
@@ -628,6 +674,7 @@ function makeCalendarInfo(classList) {
 }
 
 
+// quick note: this function handles m ak et im es id e.
 function makeTimeSide(firstMinute, lastMinute, pixelsPerMinute) {
   const timeBox = document.createElement("div");
   timeBox.className = "calendar-times";
@@ -644,6 +691,7 @@ function makeTimeSide(firstMinute, lastMinute, pixelsPerMinute) {
 }
 
 
+// quick note: this function handles a dd ho ur li ne s.
 function addHourLines(trackBox, firstMinute, lastMinute, pixelsPerMinute) {
   for (let minuteMark = firstMinute; minuteMark <= lastMinute; minuteMark += 15) {
     const lineBox = document.createElement("div");
@@ -656,6 +704,7 @@ function addHourLines(trackBox, firstMinute, lastMinute, pixelsPerMinute) {
 }
 
 
+// quick note: this function handles m ea su re cl as sc ar dh ei gh t.
 function measureClassCardHeight(cardBox) {
   const cardStyle = window.getComputedStyle(cardBox);
   const minimumHeight = parseFloat(cardStyle.minHeight) || 0;
@@ -666,6 +715,7 @@ function measureClassCardHeight(cardBox) {
 }
 
 
+// quick note: this function handles f or ma tc ou rs es ec ti on la be l.
 function formatCourseSectionLabel(courseNumber, sectionNumber) {
   const courseText = String(courseNumber || "").trim();
   const sectionText = String(sectionNumber || "").trim();
@@ -721,6 +771,7 @@ function formatCourseSectionLabel(courseNumber, sectionNumber) {
 }
 
 
+// quick note: this function handles g et re ad ab le te xt co lo r.
 function getReadableTextColor(hexColor, fallbackColor = "#0e3b2e") {
   const cleanHex = String(hexColor || "").replace("#", "").trim();
   if (!/^[0-9a-fA-F]{6}$/.test(cleanHex)) {
@@ -735,6 +786,7 @@ function getReadableTextColor(hexColor, fallbackColor = "#0e3b2e") {
 }
 
 
+// quick note: this function handles d ar ke nh ex co lo r.
 function darkenHexColor(hexColor, amount = 34, fallbackColor = "#2f7d67") {
   const cleanHex = String(hexColor || "").replace("#", "").trim();
   if (!/^[0-9a-fA-F]{6}$/.test(cleanHex)) {
@@ -749,6 +801,7 @@ function darkenHexColor(hexColor, amount = 34, fallbackColor = "#2f7d67") {
 }
 
 
+// quick note: this function handles c le ar pe nd in gd el et ed ev en t.
 function clearPendingDeletedEvent() {
   lastDeletedCustomEvent = null;
 
@@ -759,6 +812,7 @@ function clearPendingDeletedEvent() {
 }
 
 
+// quick note: this function handles s to re de le te de ve nt fo ru nd o.
 function storeDeletedEventForUndo(eventItem) {
   clearPendingDeletedEvent();
   lastDeletedCustomEvent = { ...eventItem };
@@ -774,6 +828,7 @@ function storeDeletedEventForUndo(eventItem) {
 }
 
 
+// quick note: this function handles r es to re la st de le te de ve nt.
 function restoreLastDeletedEvent() {
   if (!lastDeletedCustomEvent) {
     return;
@@ -786,6 +841,7 @@ function restoreLastDeletedEvent() {
 }
 
 
+// quick note: this function handles a dj us tc al en da rz oo m.
 function adjustCalendarZoom(delta) {
   const nextZoom = Math.max(calendarZoomMin, Math.min(calendarZoomMax, calendarZoom + delta));
   if (Math.abs(nextZoom - calendarZoom) < 0.001) {
@@ -797,6 +853,7 @@ function adjustCalendarZoom(delta) {
 }
 
 
+// quick note: this function handles r un pr in ts ch ed ul e.
 function runPrintSchedule() {
   const calendarBoard = document.querySelector("#scheduleGrid .calendar-board");
   if (!calendarBoard) {
@@ -812,6 +869,7 @@ function runPrintSchedule() {
 }
 
 
+// quick note: this function handles c le ar sc he du le da le rt by id.
 function clearScheduledAlertById(alertId) {
   const alertItem = scheduledEventAlerts.find(oneAlert => oneAlert.id === alertId);
   if (alertItem && alertItem.timeoutId !== null) {
@@ -822,6 +880,7 @@ function clearScheduledAlertById(alertId) {
 }
 
 
+// quick note: this function handles c le ar sc he du le da le rt sf or ev en t.
 function clearScheduledAlertsForEvent(eventId) {
   scheduledEventAlerts
     .filter(oneAlert => oneAlert.eventId === eventId)
@@ -835,6 +894,7 @@ function clearScheduledAlertsForEvent(eventId) {
 }
 
 
+// quick note: this function handles c le ar al ls ch ed ul ed al er ts.
 function clearAllScheduledAlerts() {
   scheduledEventAlerts.forEach(oneAlert => {
     if (oneAlert.timeoutId !== null) {
@@ -846,6 +906,7 @@ function clearAllScheduledAlerts() {
 }
 
 
+// quick note: this function handles g et ne xt ev en td at e.
 function getNextEventDate(dayName, startMinutes) {
   const now = new Date();
   const targetDay = reminderDayToIndex[dayName];
@@ -868,6 +929,7 @@ function getNextEventDate(dayName, startMinutes) {
 }
 
 
+// quick note: this function handles m ak ec ou rs ew or ke ve nt sf or sc he du le.
 function makeCourseWorkEventsForSchedule(classList) {
   if (schedulerMode !== "course") {
     return [];
@@ -948,6 +1010,7 @@ function makeCourseWorkEventsForSchedule(classList) {
 }
 
 
+// quick note: this function handles s ch ed ul ee ve nt al er tf or ev en t.
 function scheduleEventAlertForEvent(eventItem, minutesBefore) {
   const nextEventDate = getNextEventDate(eventItem.day, eventItem.start);
   if (!nextEventDate) {
@@ -986,6 +1049,7 @@ function scheduleEventAlertForEvent(eventItem, minutesBefore) {
 }
 
 
+// quick note: this function handles m ak ec la ss ca rd.
 function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
   const cardBox = document.createElement("article");
   const cardTop = (classItem.start - firstMinute) * pixelsPerMinute;
@@ -1041,6 +1105,7 @@ function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
 }
 
 
+// quick note: this function handles m ak ed ay co lu mn.
 function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinute, pixelsPerMinute) {
   const dayBox = document.createElement("section");
   dayBox.className = "calendar-day";
@@ -1168,6 +1233,7 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinu
   return dayBox;
 }
 
+// quick note: this function handles s ho wc al en da r.
 function showCalendar(classList) {
   const box = byId("scheduleGrid");
   box.innerHTML = "";
@@ -1206,7 +1272,7 @@ function showCalendar(classList) {
   favoriteButton.type = "button";
   const isFavorite = isFavoriteSchedule(currentScheduleIndex);
   favoriteButton.className = `btn-main btn-star calendar-favorite-btn${isFavorite ? " active" : ""}`;
-  favoriteButton.textContent = isFavorite ? "★" : "☆";
+  favoriteButton.textContent = isFavorite ? "â˜…" : "â˜†";
   favoriteButton.title = isFavorite
     ? "Unhighlight this schedule option"
     : "Highlight this schedule option";
@@ -1358,12 +1424,14 @@ function showCalendar(classList) {
     }
 
     if (colorPalette && colorSwatchButton) {
+      // quick note: this function handles c lo se co lo rp al et te.
       function closeColorPalette() {
         colorPalette.hidden = true;
         colorPalette.classList.remove("open-upward");
         clearActivePaletteListener();
       }
 
+      // quick note: this function handles o pe nc ol or pa le tt e.
       function openColorPalette() {
         colorPalette.hidden = false;
         colorPalette.classList.remove("open-upward");
@@ -1448,6 +1516,7 @@ function showCalendar(classList) {
       });
     });
 
+    // quick note: this function handles a dd cu st om ev en tf ro mi np ut s.
     function addCustomEventFromInputs() {
       const eventTitle = (eventTitleInput.value || "").trim() || "Custom Event";
       const eventColor = selectedEventColor;
@@ -1493,6 +1562,7 @@ function showCalendar(classList) {
       renderCurrentSchedule();
     }
 
+    // quick note: this function handles u pd at ec us to mr em in de rv is ib il it y.
     function updateCustomReminderVisibility() {
       const isCustomReminder = alertOffsetSelect.value === "custom";
       alertCustomWrap.hidden = !isCustomReminder;
@@ -1501,6 +1571,7 @@ function showCalendar(classList) {
       }
     }
 
+    // quick note: this function handles c re at er em in de rf or ev en t.
     function createReminderForEvent() {
       alertMessageBox.textContent = "";
       const selectedEventId = Number(alertEventSelect.value);
@@ -1528,6 +1599,7 @@ function showCalendar(classList) {
         : "Could not set alert for that event.";
     }
 
+    // quick note: this function handles a pp ly ca le nd ar op ti on s.
     function applyCalendarOptions(showValidationError) {
       const startMinutes = parseTimeInputToMinutes(startInput.value);
       const endMinutes = parseTimeInputToMinutes(endInput.value);
@@ -1725,7 +1797,7 @@ function showCalendar(classList) {
   const undoButton = document.createElement("button");
   undoButton.type = "button";
   undoButton.className = "btn-main calendar-undo-btn";
-  undoButton.textContent = "↶ Undo";
+  undoButton.textContent = "â†¶ Undo";
   undoButton.title = lastDeletedCustomEvent
     ? "Restore the most recently deleted event"
     : "No deleted event to restore";
@@ -1753,6 +1825,7 @@ function showCalendar(classList) {
 }
 
 
+// quick note: this function handles r en de rc ur re nt sc he du le.
 function renderCurrentSchedule() {
   const classList = schedules[currentScheduleIndex] || [];
   showChosenClasses(classList);
@@ -1760,6 +1833,7 @@ function renderCurrentSchedule() {
 }
 
 
+// quick note: this function handles r er en de ro nr es iz e.
 function rerenderOnResize() {
   if (!schedules.length) {
     return;
@@ -1768,6 +1842,7 @@ function rerenderOnResize() {
   renderCurrentSchedule();
 }
 
+// quick note: this function handles r en de rs ch ed ul eb ut to ns.
 function renderScheduleButtons() {
   const box = byId("scheduleOptions");
   box.innerHTML = "";
@@ -1787,7 +1862,7 @@ function renderScheduleButtons() {
 
     let labelText = `Option ${buttonIndex + 1}`;
     if (isFavoriteSchedule(buttonIndex)) {
-      labelText += " ★";
+      labelText += " â˜…";
     }
     optionButton.textContent = labelText;
 
@@ -1806,6 +1881,7 @@ function renderScheduleButtons() {
 }
 
 
+// quick note: this function handles r ea ds ch ed ul ed at a.
 async function readScheduleData(serverResponse) {
   const contentType = serverResponse.headers.get("content-type") || "";
 
@@ -1817,6 +1893,7 @@ async function readScheduleData(serverResponse) {
 }
 
 
+// quick note: this function handles s ho ws ch ed ul ee rr or.
 function showScheduleError(message) {
   byId("requestMessage").textContent = message;
   clearScheduleUi();
@@ -1824,12 +1901,14 @@ function showScheduleError(message) {
 }
 
 
+// quick note: this function handles c le ar te ac he ru i.
 function clearTeacherUi() {
   byId("teacherMessage").textContent = "";
   byId("teacherResults").innerHTML = "";
 }
 
 
+// quick note: this function handles r en de rt ea ch er re su lt s.
 function renderTeacherResults(teacherList) {
   const messageBox = byId("teacherMessage");
   const resultsBox = byId("teacherResults");
@@ -1870,6 +1949,7 @@ function renderTeacherResults(teacherList) {
 }
 
 
+// quick note: this function handles a pp ly se rv er sc he du le s.
 function applyServerSchedules(serverData, appendMode, preserveLockedSections) {
   const loadedSchedules = serverData.valid_schedules || [];
 
@@ -1909,6 +1989,7 @@ function applyServerSchedules(serverData, appendMode, preserveLockedSections) {
   renderCurrentSchedule();
 }
 
+// quick note: this function handles r un sc he du le se ar ch.
 async function runScheduleSearch() {
   const typedClasses = getTypedClasses();
   const chosenTerm = getTermNumber();
@@ -1957,6 +2038,7 @@ async function runScheduleSearch() {
 }
 
 
+// quick note: this function handles r un lo ad mo re sc he du le s.
 async function runLoadMoreSchedules() {
   if (!currentRequest || !hasMoreSchedules) {
     return;
@@ -1987,6 +2069,7 @@ async function runLoadMoreSchedules() {
 }
 
 
+// quick note: this function handles r un ma ni pu la te sc he du le s.
 async function runManipulateSchedules() {
   if (!currentRequest || !schedules.length) {
     return;
@@ -2063,6 +2146,7 @@ async function runManipulateSchedules() {
 }
 
 
+// quick note: this function handles r un re se tm an ip ul at ed sc he du le s.
 function runResetManipulatedSchedules() {
   if (!editedIndexes.size) {
     byId("requestMessage").textContent = "No manipulated schedules to reset.";
@@ -2121,6 +2205,7 @@ function runResetManipulatedSchedules() {
 }
 
 
+// quick note: this function handles c le ar ac ti ve pa le tt el is te ne r.
 function clearActivePaletteListener() {
   if (activePaletteCloseListener) {
     document.removeEventListener("mousedown", activePaletteCloseListener);
@@ -2129,6 +2214,7 @@ function clearActivePaletteListener() {
 }
 
 
+// quick note: this function handles s ho ww el co me sc re en.
 function showWelcomeScreen() {
   byId("welcomeScreen").hidden = false;
   byId("appShell").hidden = true;
@@ -2148,6 +2234,7 @@ function showWelcomeScreen() {
 }
 
 
+// quick note: this function handles s et sc he du le rm od e.
 function setSchedulerMode(nextMode) {
   if (nextMode === "work") {
     window.location.href = "./WorkScheduler.html";
@@ -2181,14 +2268,20 @@ function setSchedulerMode(nextMode) {
 }
 
 
+// quick note: this function handles m ak ew or kd ay ch ip s.
 function makeWorkDayChips(selectedDays = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"])) {
-  return allCalendarDays.map(dayName => {
+  const chipList = [];
+
+  allCalendarDays.forEach(dayName => {
     const isSelected = selectedDays.has(dayName);
-    return `<button type="button" class="work-day-chip${isSelected ? " active" : ""}" data-day="${dayName}">${dayName.slice(0, 1)}</button>`;
-  }).join("");
+    chipList.push(`<button type="button" class="work-day-chip${isSelected ? " active" : ""}" data-day="${dayName}">${dayName.slice(0, 1)}</button>`);
+  });
+
+  return chipList.join("");
 }
 
 
+// quick note: this function handles a dd em pl oy ee ro w.
 function addEmployeeRow(defaultData = {}) {
   const employeeList = byId("employeeList");
   const rowId = `workEmployee${workEmployeeRowIdCounter}`;
@@ -2240,6 +2333,7 @@ function addEmployeeRow(defaultData = {}) {
 }
 
 
+// quick note: this function handles p ar se em pl oy ee ro ws.
 function parseEmployeeRows() {
   const rows = [...document.querySelectorAll(".work-employee-row")];
   return rows.map(rowBox => {
@@ -2260,6 +2354,7 @@ function parseEmployeeRows() {
 }
 
 
+// quick note: this function handles r un wo rk sc he du le ge ne ra ti on.
 function runWorkScheduleGeneration() {
   const employees = parseEmployeeRows();
   if (!employees.length) {
@@ -2302,7 +2397,7 @@ function runWorkScheduleGeneration() {
     }
     const employeeColor = employeeColorMap.get(employee.name);
 
-    employee.selectedDays.forEach(dayName => {
+    for (const dayName of employee.selectedDays) {
       const availableMinutes = employee.endMinutes - employee.startMinutes;
       const shiftMinutes = Math.min(availableMinutes, perDayTarget);
       const candidateStart = dayNextStart[dayName] === null
@@ -2329,7 +2424,7 @@ function runWorkScheduleGeneration() {
       });
       nextCustomEventId += 1;
       dayNextStart[dayName] = Math.min(employee.endMinutes, shiftEnd + 10);
-    });
+    }
   }
 
   customCalendarEvents = generatedEvents;
@@ -2346,6 +2441,7 @@ function runWorkScheduleGeneration() {
 }
 
 
+// quick note: this function handles r un te ac he rs ea rc h.
 async function runTeacherSearch() {
   const typedTeacher = byId("teacherRequest").value.trim();
   const chosenTerm = getTermNumber();
@@ -2382,6 +2478,7 @@ async function runTeacherSearch() {
 }
 
 
+// quick note: this function handles e ns ur ew or ke mp lo ye er ow s.
 function ensureWorkEmployeeRows() {
   if (!document.querySelector(".work-employee-row")) {
     addEmployeeRow();

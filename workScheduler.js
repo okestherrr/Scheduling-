@@ -1,4 +1,4 @@
-const allCalendarDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+﻿const allCalendarDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const presetEventColors = [
   "#F6A5A5", "#EF5350", "#F7B267", "#FB8C00", "#F7E588", "#FDD835",
   "#B8E986", "#7CB342", "#7ED7C1", "#26A69A", "#8AD2F4", "#1E88E5",
@@ -25,10 +25,12 @@ let generatedEmployeeList = [];
 let generatedCoverageList = [];
 const employeeColorByName = new Map();
 
+// this is where we get element by id.
 function getElementById(id) {
   return document.getElementById(id);
 }
 
+// this is where we minutes to clock.
 function minutesToClock(totalMinutes) {
   const safeMinutes = Math.max(0, totalMinutes);
   const hour24 = Math.floor(safeMinutes / 60);
@@ -38,6 +40,7 @@ function minutesToClock(totalMinutes) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
+// this is where we parse time input to minutes.
 function parseTimeInputToMinutes(value) {
   if (!value || !value.includes(":")) {
     return null;
@@ -51,6 +54,7 @@ function parseTimeInputToMinutes(value) {
   return (hours * 60) + minutes;
 }
 
+// this is where we minutes to time input.
 function minutesToTimeInput(totalMinutes) {
   const safeMinutes = Math.max(0, totalMinutes);
   const hours = Math.floor(safeMinutes / 60);
@@ -58,6 +62,7 @@ function minutesToTimeInput(totalMinutes) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+// this is where we minutes to compact hour.
 function minutesToCompactHour(totalMinutes) {
   const safeMinutes = Math.max(0, totalMinutes);
   const hour24 = Math.floor(safeMinutes / 60);
@@ -69,6 +74,7 @@ function minutesToCompactHour(totalMinutes) {
   return `${hour12}:${String(minute).padStart(2, "0")}`;
 }
 
+// this is where we minutes to hour am pm.
 function minutesToHourAmPm(totalMinutes) {
   const safeMinutes = Math.max(0, totalMinutes);
   const hour24 = Math.floor(safeMinutes / 60);
@@ -81,13 +87,19 @@ function minutesToHourAmPm(totalMinutes) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
+// this is where we build work day chip buttons.
 function buildWorkDayChipButtons(selectedDays = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"])) {
-  return allCalendarDays.map(dayName => {
-    const isSelected = selectedDays.has(dayName);
-    return `<button type="button" class="work-day-chip${isSelected ? " active" : ""}" data-day="${dayName}">${dayName.slice(0, 1)}</button>`;
-  }).join("");
+  const chipHtml = [];
+
+  allCalendarDays.forEach(day => {
+    const active = selectedDays.has(day);
+    chipHtml.push(`<button type="button" class="work-day-chip${active ? " active" : ""}" data-day="${day}">${day.slice(0, 1)}</button>`);
+  });
+
+  return chipHtml.join("");
 }
 
+// this is where we show work step.
 function showWorkStep(stepName) {
   const employeeStep = getElementById("workEmployeeStep");
   const templateStep = getElementById("workTemplateStep");
@@ -101,18 +113,22 @@ function showWorkStep(stepName) {
   templateTab.classList.toggle("active", !isEmployeeStep);
 }
 
+// this is where we clear employee rows.
 function clearEmployeeRows() {
   getElementById("employeeList").innerHTML = "";
 }
 
+// this is where we clear shift template rows.
 function clearShiftTemplateRows() {
   getElementById("shiftTemplateList").innerHTML = "";
 }
 
+// this is where we random int.
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// this is where we sample unique names.
 function sampleUniqueNames(count) {
   const firstNames = ["Ava", "Noah", "Mia", "Ethan", "Liam", "Emma", "Olivia", "Mason", "Elijah", "Sophia", "Amelia", "Lucas", "Harper", "James", "Isla", "Daniel", "Levi", "Grace", "Nora", "Logan"];
   const lastNames = ["Bennett", "Carter", "Diaz", "Foster", "Green", "Hayes", "Irwin", "Jordan", "Khan", "Lopez", "Morris", "Nguyen", "Owens", "Patel", "Quinn", "Reed", "Sanchez", "Turner", "Vasquez", "Walker"];
@@ -132,6 +148,7 @@ function sampleUniqueNames(count) {
   return names;
 }
 
+// this is where we generate employee testing data.
 function generateEmployeeTestingData() {
   const employeeCount = randomInt(6, 10);
   const names = sampleUniqueNames(employeeCount);
@@ -166,6 +183,7 @@ function generateEmployeeTestingData() {
   getElementById("workMessage").textContent = "Testing data loaded for employees.";
 }
 
+// this is where we generate shift testing data.
 function generateShiftTestingData() {
   clearShiftTemplateRows();
 
@@ -187,6 +205,7 @@ function generateShiftTestingData() {
   getElementById("workMessage").textContent = "Testing data loaded for shift details.";
 }
 
+// this is where we add employee row.
 function addEmployeeRow(defaultData = {}) {
   const employeeList = getElementById("employeeList");
   const rowId = `workEmployee${employeeRowIdCounter}`;
@@ -240,27 +259,36 @@ function addEmployeeRow(defaultData = {}) {
   employeeList.appendChild(rowBox);
 }
 
+// this is where we parse employee rows.
 function parseEmployeeRows() {
   const rows = [...document.querySelectorAll(".work-employee-row")];
-  return rows.map(rowBox => {
-    const name = rowBox.querySelector(".work-name").value.trim();
-    const preferredHours = Number.parseInt(rowBox.querySelector(".work-hours").value, 10);
-    const maxWeeklyHours = Number.parseInt(rowBox.querySelector(".work-max-hours").value, 10);
-    const startMinutes = parseTimeInputToMinutes(rowBox.querySelector(".work-start").value);
-    const endMinutes = parseTimeInputToMinutes(rowBox.querySelector(".work-end").value);
-    const selectedDays = [...rowBox.querySelectorAll(".work-day-chip.active")].map(button => button.dataset.day);
+  const items = [];
 
-    return {
+  rows.forEach(row => {
+    const name = row.querySelector(".work-name").value.trim();
+    const preferredHours = Number.parseInt(row.querySelector(".work-hours").value, 10);
+    const maxWeeklyHours = Number.parseInt(row.querySelector(".work-max-hours").value, 10);
+    const startMinutes = parseTimeInputToMinutes(row.querySelector(".work-start").value);
+    const endMinutes = parseTimeInputToMinutes(row.querySelector(".work-end").value);
+    const days = [];
+    row.querySelectorAll(".work-day-chip.active").forEach(button => {
+      days.push(button.dataset.day);
+    });
+
+    items.push({
       name,
       preferredHours,
       maxWeeklyHours,
       startMinutes,
       endMinutes,
-      selectedDays
-    };
+      selectedDays: days
+    });
   });
+
+  return items;
 }
 
+// this is where we add shift template row.
 function addShiftTemplateRow(defaultData = {}) {
   const list = getElementById("shiftTemplateList");
   const rowId = `shiftTemplate${templateRowIdCounter}`;
@@ -302,17 +330,25 @@ function addShiftTemplateRow(defaultData = {}) {
   list.appendChild(row);
 }
 
+// this is where we parse shift template rows.
 function parseShiftTemplateRows() {
   const rows = [...document.querySelectorAll(".shift-template-row")];
-  return rows.map(row => ({
-    name: row.querySelector(".template-name").value.trim(),
-    dayGroup: row.querySelector(".template-day-group").value,
-    start: parseTimeInputToMinutes(row.querySelector(".template-start").value),
-    end: parseTimeInputToMinutes(row.querySelector(".template-end").value),
-    need: Number.parseInt(row.querySelector(".template-need").value, 10)
-  }));
+  const items = [];
+
+  rows.forEach(row => {
+    items.push({
+      name: row.querySelector(".template-name").value.trim(),
+      dayGroup: row.querySelector(".template-day-group").value,
+      start: parseTimeInputToMinutes(row.querySelector(".template-start").value),
+      end: parseTimeInputToMinutes(row.querySelector(".template-end").value),
+      need: Number.parseInt(row.querySelector(".template-need").value, 10)
+    });
+  });
+
+  return items;
 }
 
+// this is where we expand day group.
 function expandDayGroup(dayGroup) {
   if (dayGroup === "Weekdays") {
     return ["Mon", "Tue", "Wed", "Thu", "Fri"];
@@ -326,12 +362,15 @@ function expandDayGroup(dayGroup) {
   return [];
 }
 
+// this is where we expand shift templates to requirements.
 function expandShiftTemplatesToRequirements(templates) {
-  const requirements = [];
-  templates.forEach(template => {
+  const output = [];
+
+  // one template can apply to multiple days, so we break it out into real day-by-day requirements
+  for (const template of templates) {
     const days = expandDayGroup(template.dayGroup);
-    days.forEach(day => {
-      requirements.push({
+    for (const day of days) {
+      output.push({
         templateName: template.name,
         dayGroup: template.dayGroup,
         day,
@@ -339,11 +378,13 @@ function expandShiftTemplatesToRequirements(templates) {
         end: template.end,
         need: template.need
       });
-    });
-  });
-  return requirements;
+    }
+  }
+
+  return output;
 }
 
+// this is where we parse global rules.
 function parseGlobalRules() {
   const businessStart = parseTimeInputToMinutes(getElementById("workBusinessStart").value);
   const businessEnd = parseTimeInputToMinutes(getElementById("workBusinessEnd").value);
@@ -361,14 +402,23 @@ function parseGlobalRules() {
   };
 }
 
+// this is where we create need grid.
 function createNeedGrid(slotStartsByDay) {
-  const needByDay = {};
-  allCalendarDays.forEach(dayName => {
-    needByDay[dayName] = slotStartsByDay[dayName].map(() => 0);
+  const needGrid = {};
+
+  // start every slot at 0 workers needed, then fill real needs later
+  allCalendarDays.forEach(day => {
+    const daySlots = slotStartsByDay[day];
+    needGrid[day] = [];
+    for (let i = 0; i < daySlots.length; i += 1) {
+      needGrid[day].push(0);
+    }
   });
-  return needByDay;
+
+  return needGrid;
 }
 
+// this is where we create slot starts by day.
 function createSlotStartsByDay(businessStart, businessEnd, slotSize) {
   const slotStartsByDay = {};
   allCalendarDays.forEach(dayName => {
@@ -380,23 +430,27 @@ function createSlotStartsByDay(businessStart, businessEnd, slotSize) {
   return slotStartsByDay;
 }
 
+// this is where we apply shift template needs.
 function applyShiftTemplateNeeds(needByDay, requirements, slotStartsByDay, slotSize) {
-  requirements.forEach(requirement => {
-    const slots = needByDay[requirement.day];
-    const starts = slotStartsByDay[requirement.day];
+  // paint each template's "need" onto the matching time slots for that day
+  requirements.forEach(rule => {
+    const slots = needByDay[rule.day];
+    const starts = slotStartsByDay[rule.day];
     if (!slots || !starts) {
       return;
     }
 
-    starts.forEach((slotStart, slotIndex) => {
+    for (let slotIndex = 0; slotIndex < starts.length; slotIndex += 1) {
+      const slotStart = starts[slotIndex];
       const slotEnd = slotStart + slotSize;
-      if (slotStart >= requirement.start && slotEnd <= requirement.end) {
-        slots[slotIndex] = Math.max(slots[slotIndex], requirement.need);
+      if (slotStart >= rule.start && slotEnd <= rule.end) {
+        slots[slotIndex] = Math.max(slots[slotIndex], rule.need);
       }
-    });
+    }
   });
 }
 
+// this is where we is employee available for shift slot.
 function isEmployeeAvailableForShiftSlot(employee, dayName, slotStart, slotEnd) {
   if (!employee.selectedDays.includes(dayName)) {
     return false;
@@ -404,10 +458,12 @@ function isEmployeeAvailableForShiftSlot(employee, dayName, slotStart, slotEnd) 
   return slotStart >= employee.startMinutes && slotEnd <= employee.endMinutes;
 }
 
+// this is where we is employee assigned in slot.
 function isEmployeeAssignedInSlot(assignmentsByDay, dayName, slotIndex, employeeName) {
   return assignmentsByDay[dayName][slotIndex].includes(employeeName);
 }
 
+// this is where we count trailing assigned slots.
 function countTrailingAssignedSlots(assignmentsByDay, dayName, slotIndex, employeeName) {
   let streak = 0;
   for (let index = slotIndex - 1; index >= 0; index -= 1) {
@@ -419,6 +475,7 @@ function countTrailingAssignedSlots(assignmentsByDay, dayName, slotIndex, employ
   return streak;
 }
 
+// this is where we has assigned earlier slot.
 function hasAssignedEarlierSlot(assignmentsByDay, dayName, slotIndex, employeeName) {
   for (let index = 0; index < slotIndex; index += 1) {
     if (isEmployeeAssignedInSlot(assignmentsByDay, dayName, index, employeeName)) {
@@ -428,8 +485,10 @@ function hasAssignedEarlierSlot(assignmentsByDay, dayName, slotIndex, employeeNa
   return false;
 }
 
+// this is where we count future available slots.
 function countFutureAvailableSlots(employee, dayName, slotStarts, fromIndex, slotSize, maxSlots) {
   let count = 0;
+  // check how far this person can keep working from this point forward
   for (let index = fromIndex; index < slotStarts.length && count < maxSlots; index += 1) {
     const slotStart = slotStarts[index];
     const slotEnd = slotStart + slotSize;
@@ -441,8 +500,10 @@ function countFutureAvailableSlots(employee, dayName, slotStarts, fromIndex, slo
   return count;
 }
 
+// this is where we count future needed slots.
 function countFutureNeededSlots(needSlots, fromIndex, maxSlots) {
   let count = 0;
+  // check how many upcoming slots actually still need people
   for (let index = fromIndex; index < needSlots.length && count < maxSlots; index += 1) {
     if ((needSlots[index] || 0) <= 0) {
       break;
@@ -452,6 +513,7 @@ function countFutureNeededSlots(needSlots, fromIndex, maxSlots) {
   return count;
 }
 
+// this is where we select shift candidates for slot.
 function selectShiftCandidatesForSlot({
   employees,
   dayName,
@@ -468,6 +530,7 @@ function selectShiftCandidatesForSlot({
   const slotEnd = slotStart + slotSize;
   const primary = [];
 
+  // build a list of people who are valid for this exact slot
   employees.forEach(employee => {
     if (!isEmployeeAvailableForSlot(employee, dayName, slotStart, slotEnd)) {
       return;
@@ -514,6 +577,7 @@ function selectShiftCandidatesForSlot({
 
     const remainingPreferred = Math.max(0, (employee.preferredHours * 60) - workedMinutes);
 
+    // keep extra info so sorting can pick the "best" next person fairly
     const candidate = {
       employee,
       workedMinutes,
@@ -550,9 +614,11 @@ function selectShiftCandidatesForSlot({
   return primary;
 }
 
+// this is where we build shifts from assignments.
 function buildShiftsFromAssignments(employees, assignmentsByDay, slotStartsByDay, slotSize) {
   const shifts = [];
 
+  // merge back-to-back assigned slots into one bigger shift block per employee/day
   employees.forEach(employee => {
     allCalendarDays.forEach(dayName => {
       const slots = assignmentsByDay[dayName];
@@ -591,7 +657,9 @@ function buildShiftsFromAssignments(employees, assignmentsByDay, slotStartsByDay
   return shifts;
 }
 
+// this is where we build coverage summary.
 function buildCoverageSummary(requirements, assignmentsByDay, slotStartsByDay, slotSize) {
+  // coverage is the minimum people covering any slot inside that template window
   return requirements.map(requirement => {
     const assignedNames = new Set();
     let minCovered = Number.POSITIVE_INFINITY;
@@ -615,6 +683,7 @@ function buildCoverageSummary(requirements, assignmentsByDay, slotStartsByDay, s
   });
 }
 
+// this is where we group shifts by employee day.
 function groupShiftsByEmployeeDay(shifts) {
   const grouped = new Map();
   shifts.forEach(shift => {
@@ -632,6 +701,7 @@ function groupShiftsByEmployeeDay(shifts) {
   return grouped;
 }
 
+// this is where we render totals.
 function renderTotals(shifts) {
   const totalsBox = getElementById("workTotals");
   if (!shifts.length) {
@@ -646,10 +716,15 @@ function renderTotals(shifts) {
     minutesByEmployee.set(shift.employeeName, (minutesByEmployee.get(shift.employeeName) || 0) + minutes);
   });
 
-  const summaryRows = [...minutesByEmployee.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([employeeName, minutes]) => `<div class="work-totals-row"><strong>${employeeName}</strong><span>${(minutes / 60).toFixed(2)} hrs</span></div>`)
-    .join("");
+  const employeeEntries = [...minutesByEmployee.entries()];
+  employeeEntries.sort((a, b) => a[0].localeCompare(b[0]));
+
+  const summaryRowsList = [];
+  employeeEntries.forEach(([employeeName, minutes]) => {
+    summaryRowsList.push(`<div class="work-totals-row"><strong>${employeeName}</strong><span>${(minutes / 60).toFixed(2)} hrs</span></div>`);
+  });
+
+  const summaryRows = summaryRowsList.join("");
 
   totalsBox.innerHTML = `
     <h3>Total Hours by Employee</h3>
@@ -658,6 +733,7 @@ function renderTotals(shifts) {
   totalsBox.hidden = false;
 }
 
+// this is where we render coverage.
 function renderCoverage(coverageRows) {
   const coverageBox = getElementById("staffingCoverage");
   if (!coverageRows.length) {
@@ -666,9 +742,11 @@ function renderCoverage(coverageRows) {
     return;
   }
 
-  const rowsMarkup = coverageRows.map(period => {
+  const rowsMarkupList = [];
+
+  coverageRows.forEach(period => {
     const assigned = period.assignedNames.length ? period.assignedNames.join(", ") : "No one assigned";
-    return `
+    rowsMarkupList.push(`
       <div class="work-coverage-row${period.isUnderstaffed ? " understaffed" : ""}">
         <div class="work-coverage-heading">
           <strong>${period.templateName || "Shift"} - ${period.day} ${minutesToClock(period.start)} - ${minutesToClock(period.end)}</strong>
@@ -676,8 +754,10 @@ function renderCoverage(coverageRows) {
         </div>
         <div class="work-coverage-assigned">Assigned: ${assigned}</div>
       </div>
-    `;
-  }).join("");
+    `);
+  });
+
+  const rowsMarkup = rowsMarkupList.join("");
 
   coverageBox.innerHTML = `
     <h3>Coverage by Shift Template</h3>
@@ -686,6 +766,7 @@ function renderCoverage(coverageRows) {
   coverageBox.hidden = false;
 }
 
+// this is where we get shift breaks.
 function getShiftBreaks(shift) {
   const duration = Math.max(0, shift.end - shift.start);
   if (duration >= 8 * 60) {
@@ -699,6 +780,7 @@ function getShiftBreaks(shift) {
   return [];
 }
 
+// this is where we print work schedule.
 function printWorkSchedule() {
   document.body.classList.add("print-calendar-only");
   window.print();
@@ -707,6 +789,7 @@ function printWorkSchedule() {
   }, 250);
 }
 
+// this is where we render schedule.
 function renderSchedule() {
   const scheduleGrid = byId("scheduleGrid");
   scheduleGrid.innerHTML = "";
@@ -717,6 +800,7 @@ function renderSchedule() {
     return;
   }
 
+  // hide weekend columns unless we actually scheduled weekend shifts
   const shiftsByEmployeeDay = groupShiftsByEmployeeAndDay(generatedShiftList);
   const hasSaturdayShift = generatedShiftList.some(shift => shift.day === "Sat");
   const hasSundayShift = generatedShiftList.some(shift => shift.day === "Sun");
@@ -740,6 +824,7 @@ function renderSchedule() {
   });
 
   const rules = parseGlobalRules();
+  // timeline snaps to full hours so the grid labels look clean
   const windowStart = Number.isInteger(rules.businessStart) ? rules.businessStart : 9 * 60;
   const windowEnd = Number.isInteger(rules.businessEnd) ? rules.businessEnd : 21 * 60;
   const timelineStart = Math.floor(windowStart / 60) * 60;
@@ -924,6 +1009,7 @@ function renderSchedule() {
   scheduleGrid.appendChild(table);
 }
 
+// this is where we generate work schedule.
 function generateWorkSchedule() {
   const employees = readEmployeeRows();
   const templates = readShiftTemplateRows();
@@ -950,6 +1036,7 @@ function generateWorkSchedule() {
     return;
   }
 
+  // first pass: validate employee data + assign each person a color if needed
   let colorIndex = employeeColorByName.size;
   for (const employee of employees) {
     if (!employee.name) {
@@ -983,6 +1070,7 @@ function generateWorkSchedule() {
     }
   }
 
+  // second pass: validate every shift template before we start scheduling
   for (const template of templates) {
     if (!template.name) {
       byId("workMessage").textContent = "Each shift template needs a name.";
@@ -1006,6 +1094,7 @@ function generateWorkSchedule() {
     }
   }
 
+  // convert rules/templates into slot-by-slot staffing needs
   const minShiftSlots = Math.max(1, Math.ceil((rules.minShiftHours * 60) / rules.slotSize));
   const maxShiftSlots = Math.max(minShiftSlots, Math.floor((rules.maxShiftHours * 60) / rules.slotSize));
   const slotStartsByDay = createSlotStartsByDay(rules.businessStart, rules.businessEnd, rules.slotSize);
@@ -1013,6 +1102,7 @@ function generateWorkSchedule() {
   applyShiftTemplateNeeds(needByDay, requirements, slotStartsByDay, rules.slotSize);
 
   const assignmentsByDay = {};
+  // main scheduling loop: for each slot, pick the best available people
   allCalendarDays.forEach(dayName => {
     assignmentsByDay[dayName] = slotStartsByDay[dayName].map(() => []);
   });
@@ -1053,6 +1143,7 @@ function generateWorkSchedule() {
     });
   });
 
+  // after assignment, build final objects used by the UI
   generatedShiftList = buildShiftsFromAssignments(employees, assignmentsByDay, slotStartsByDay, rules.slotSize);
   generatedEmployeeList = employees;
   generatedCoverageList = buildCoverageSummary(requirements, assignmentsByDay, slotStartsByDay, rules.slotSize);
