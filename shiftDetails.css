@@ -1,0 +1,23 @@
+@import "./homepage.css";
+
+/*employee preview section*/
+.work-employee-summary-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #b8d8df;
+  background: #f6fdff;
+}
+
+/*organizes the employee list*/
+.employee-summary-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+/*employee name and details*/
+.employee-summary-list li {
+  color: #1f3e48;
+  font-size: 0.92rem;
+}

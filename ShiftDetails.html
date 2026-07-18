@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shift Details</title>
+    <link rel="stylesheet" href="./shiftDetails.css" />
+    <script src="./shiftDetails.js" defer></script>
+    <script src="./workScheduler.js" defer></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <div class="top-home-row">
+        <a class="btn-main mode-switch-btn" href="./homepage.html">Home</a>
+        <a class="btn-main mode-switch-btn" href="./homepage.html?view=course">Course Scheduling</a>
+        <a class="btn-main mode-switch-btn" href="./WorkScheduler.html">Employee Details</a>
+      </div>
+
+      <section class="hero" id="workHero">
+        <div class="work-title-row">
+          <h1>Shift Details</h1>
+          <button id="workTestingEmployeesBtn" class="btn-main work-link-btn" type="button">Testing</button>
+        </div>
+        <p>Set shift templates and generate the weekly schedule.</p>
+
+        <section class="work-employee-summary-panel">
+          <div class="work-panel-title-row">
+            <h3>Saved Employees</h3>
+            <button id="editEmployeesBtn" class="btn-main work-link-btn" type="button">Edit Employees</button>
+          </div>
+          <div id="employeeSummaryList"></div>
+        </section>
+
+        <section class="work-constraints-panel">
+          <h3>Work Details</h3>
+          <div class="work-constraints-grid">
+            <label class="calendar-options-field" for="workBusinessStart">
+              <span>Shifts start:</span>
+              <input id="workBusinessStart" type="time" step="60" />
+            </label>
+            <label class="calendar-options-field" for="workBusinessEnd">
+              <span>Shifts end:</span>
+              <input id="workBusinessEnd" type="time" step="60" />
+            </label>
+          </div>
+        </section>
+
+        <section class="work-staffing-panel">
+          <div class="work-panel-title-row">
+            <h3>Shift Templates</h3>
+            <button id="addShiftTemplateBtn" class="btn-main work-link-btn" type="button">Add Shift</button>
+          </div>
+          <p class="work-staffing-copy">Example: Morning 9:00 AM-1:00 PM needs 2 employees, Afternoon 1:00 PM-5:00 PM needs 3 employees.</p>
+          <div id="shiftTemplateList"></div>
+        </section>
+
+        <div class="request-row work-actions-row work-template-actions-row">
+          <button id="getWorkScheduleBtn" class="btn-main" type="button">Get Schedule</button>
+        </div>
+
+        <p id="workMessage"></p>
+      </section>
+
+      <section class="results-panel">
+        <div id="scheduleGrid"></div>
+        <div id="staffingCoverage" class="work-coverage-panel" hidden></div>
+        <div id="workTotals" class="work-totals-panel" hidden></div>
+      </section>
+    </main>
+  </body>
+</html>

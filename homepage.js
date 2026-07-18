@@ -33,12 +33,12 @@ const presetEventColors = [
   "#D7CCC8", "#8D6E63"
 ];
 
-// quick note: this function handles g et ap iu rl s.
+//possible api urls
 function getApiUrls(pathSuffix) {
   const urls = [];
   const path = pathSuffix.startsWith("/") ? pathSuffix : `/${pathSuffix}`;
 
-  // quick note: this function handles a dd ur l.
+  //adds another api url
   function addUrl(url) {
     if (!urls.includes(url)) {
       urls.push(url);
@@ -68,7 +68,7 @@ function getApiUrls(pathSuffix) {
 }
 
 
-// quick note: this function handles s ho ul du se re sp on se.
+//checks if the response is valid
 function shouldUseResponse(serverResponse) {
   const typeText = serverResponse.headers.get("content-type") || "";
   const isJson = typeText.includes("application/json");
@@ -84,7 +84,7 @@ function shouldUseResponse(serverResponse) {
   return false;
 }
 
-// quick note: this function handles s en da pi re qu es t.
+//sends api request
 async function sendApiRequest(pathSuffix, requestBody) {
   const urls = getApiUrls(pathSuffix);
   let lastError = null;
@@ -122,13 +122,13 @@ async function sendApiRequest(pathSuffix, requestBody) {
 }
 
 
-// quick note: this function handles s en ds ch ed ul er eq ue st.
+//schedule request
 async function sendScheduleRequest(requestBody) {
   return sendApiRequest("/schedule", requestBody);
 }
 
 
-// quick note: this function handles s en dt ea ch er se ar ch re qu es t.
+//teacher search request
 async function sendTeacherSearchRequest(requestBody) {
   return sendApiRequest("/teachers/search", requestBody);
 }
@@ -174,7 +174,6 @@ let scheduledEventAlerts = [];
 let nextScheduledAlertId = 1;
 let schedulerMode = "course";
 let alertPanelOpen = false;
-let workEmployeeRowIdCounter = 1;
 let activePaletteCloseListener = null;
 let workHoursPanelOpen = false;
 let workHoursEnabled = false;
@@ -192,17 +191,17 @@ let calendarSettings = {
   showDevotional: false
 };
 
-// quick note: this function handles b yi d.
+//shortcut for element by id
 function byId(boxId) {
   return document.getElementById(boxId);
 }
 
-// quick note: this function handles g et re su lt sp an el.
+//results panel
 function getResultsPanel() {
   return document.querySelector(".results-panel");
 }
 
-// quick note: this function handles t og gl er es ul ts pa ne l.
+//shows or hides results
 function toggleResultsPanel(isVisible) {
   const panelBox = getResultsPanel();
   if (panelBox) {
@@ -211,7 +210,7 @@ function toggleResultsPanel(isVisible) {
 }
 
 
-// quick note: this function handles t og gl et ea ch er pa ne l.
+//shows or hides teacher search
 function toggleTeacherPanel(isVisible) {
   const panelBox = byId("teacherSearchPanel");
   if (panelBox) {
@@ -220,7 +219,7 @@ function toggleTeacherPanel(isVisible) {
 }
 
 
-// quick note: this function handles t og gl et er mp an el.
+//shows or hides term search
 function toggleTermPanel(isVisible) {
   const panelBox = byId("termPanel");
   if (panelBox) {
@@ -229,7 +228,7 @@ function toggleTermPanel(isVisible) {
 }
 
 
-// quick note: this function handles c le ar sc he du le ui.
+//clears the schedule
 function clearScheduleUi() {
   byId("scheduleOptions").textContent = "";
   byId("selectedSections").textContent = "";
@@ -237,7 +236,7 @@ function clearScheduleUi() {
 }
 
 
-// quick note: this function handles t og gl el oa dm or eb tn.
+//shows or hides load more button
 function toggleLoadMoreBtn(isVisible) {
   const loadMoreButton = byId("loadMoreBtn");
   if (loadMoreButton) {
@@ -246,7 +245,7 @@ function toggleLoadMoreBtn(isVisible) {
 }
 
 
-// quick note: this function handles t og gl em an ip ul at eb tn.
+//shows or hides manipulate button
 function toggleManipulateBtn(isVisible) {
   const manipulateButton = byId("manipulateBtn");
   if (manipulateButton) {
@@ -255,7 +254,7 @@ function toggleManipulateBtn(isVisible) {
 }
 
 
-// quick note: this function handles t og gl er es et bt n.
+//shows or hides reset button
 function toggleResetBtn(isVisible) {
   const resetButton = byId("resetManipulatedBtn");
   if (resetButton) {
@@ -264,7 +263,7 @@ function toggleResetBtn(isVisible) {
 }
 
 
-// quick note: this function handles m ak es ch ed ul es ig na tu re.
+//unique schedule id
 function makeScheduleSignature(scheduleList) {
   return scheduleList
     .map(oneSection => `${oneSection.course_number}:${oneSection.section_number}`)
@@ -273,13 +272,13 @@ function makeScheduleSignature(scheduleList) {
 }
 
 
-// quick note: this function handles i sf av or it es ch ed ul e.
+//checks if schedule is favorited
 function isFavoriteSchedule(index) {
   return favoriteIndexes.has(index);
 }
 
 
-// quick note: this function handles h as ht ex t.
+//hash for course colors
 function hashText(textValue) {
   let hashValue = 0;
 
@@ -292,7 +291,7 @@ function hashText(textValue) {
 }
 
 
-// quick note: this function handles g et co ur se pa le tt e.
+//course colors
 function getCoursePalette(courseNumber) {
   const hashValue = hashText(courseNumber);
   const hue = hashValue % 360;
@@ -307,7 +306,7 @@ function getCoursePalette(courseNumber) {
 }
 
 
-// quick note: this function handles a pp ly co ur se co lo rs ty le s.
+//adds course colors
 function applyCourseColorStyles(targetBox, classItem, options = {}) {
   const palette = getCoursePalette(classItem.course_number);
   const isIdeal = Boolean(classItem.ideal || classItem.is_ideal);
@@ -334,7 +333,7 @@ function applyCourseColorStyles(targetBox, classItem, options = {}) {
 }
 
 
-// quick note: this function handles i sl oc ke ds ec ti on.
+//checks locked sections
 function isLockedSection(classItem) {
   const lockedSection = lockedSectionsByCourse.get(String(classItem.course_number));
   if (!lockedSection) {
@@ -345,7 +344,7 @@ function isLockedSection(classItem) {
 }
 
 
-// quick note: this function handles t og gl el oc ke ds ec ti on.
+//locks or unlocks section
 function toggleLockedSection(classItem) {
   const courseCode = String(classItem.course_number);
   const sectionCode = String(classItem.section_number);
@@ -360,7 +359,7 @@ function toggleLockedSection(classItem) {
 }
 
 
-// quick note: this function handles g et lo ck ed se ct io ns pa yl oa d.
+//locked section information
 function getLockedSectionsPayload() {
   return Array.from(lockedSectionsByCourse.entries()).map(([courseNumber, sectionNumber]) => ({
     course_number: courseNumber,
@@ -369,7 +368,7 @@ function getLockedSectionsPayload() {
 }
 
 
-// quick note: this function handles b ui ld sc he du le re qu es tb od y.
+//schedule request
 function buildScheduleRequestBody(startIndex, pageSize, includeLockedSections) {
   const requestBody = {
     courses: [...currentRequest.courses],
@@ -392,7 +391,7 @@ function buildScheduleRequestBody(startIndex, pageSize, includeLockedSections) {
 }
 
 
-// quick note: this function handles r es et sc he du le ui st at e.
+//resets schedule information
 function resetScheduleUiState() {
   hasMoreSchedules = false;
   nextScheduleStartIndex = 0;
@@ -405,7 +404,7 @@ function resetScheduleUiState() {
 }
 
 
-// quick note: this function handles t og gl ef av or it es ch ed ul e.
+//favorites a schedule
 function toggleFavoriteSchedule(index) {
   if (!favoriteIndexes.has(index)) {
     favoriteIndexes.add(index);
@@ -415,7 +414,7 @@ function toggleFavoriteSchedule(index) {
 }
 
 
-// quick note: this function handles g et ty pe dc la ss es.
+//typed class list
 function getTypedClasses() {
   const text = byId("classRequest").value;
 
@@ -425,7 +424,7 @@ function getTypedClasses() {
     .filter(Boolean);
 }
 
-// quick note: this function handles g et te rm nu mb er.
+//term number
 function getTermNumber() {
   const termPanel = byId("termPanel");
   if (!termPanel || termPanel.hidden) {
@@ -445,7 +444,7 @@ function getTermNumber() {
   return termNumber;
 }
 
-// quick note: this function handles t im et ex tt om in ut es.
+//turns time into minutes
 function timeTextToMinutes(timeText) {
   if (!timeText || timeText === "NULL") {
     return null;
@@ -462,7 +461,7 @@ function timeTextToMinutes(timeText) {
   return (hourNumber * 60) + minuteNumber;
 }
 
-// quick note: this function handles m in ut es to cl oc k.
+//formats clock time
 function minutesToClock(totalMinutes) {
   const hour24 = Math.floor(totalMinutes / 60);
   const minute = totalMinutes % 60;
@@ -471,7 +470,7 @@ function minutesToClock(totalMinutes) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${amOrPm}`;
 }
 
-// quick note: this function handles s pl it cl as se sb yd ay.
+//splits classes by day
 function splitClassesByDay(classList) {
   const dayNames = { M: "Mon", T: "Tue", W: "Wed", R: "Thu", F: "Fri", S: "Sat", U: "Sun" };
   const classesByDay = {
@@ -514,7 +513,7 @@ function splitClassesByDay(classList) {
   return classesByDay;
 }
 
-// quick note: this function handles s ho wc ho se nc la ss es.
+//selected classes
 function showChosenClasses(classList) {
   const box = byId("selectedSections");
   box.innerHTML = "";
@@ -544,7 +543,7 @@ function showChosenClasses(classList) {
 }
 
 
-// quick note: this function handles p ar se ti me in pu tt om in ut es.
+//reads time input
 function parseTimeInputToMinutes(timeText) {
   if (!timeText || !timeText.includes(":")) {
     return null;
@@ -566,7 +565,7 @@ function parseTimeInputToMinutes(timeText) {
 }
 
 
-// quick note: this function handles m in ut es to in pu tt im e.
+//time input format
 function minutesToInputTime(totalMinutes) {
   const safeMinutes = Math.max(0, Math.min(24 * 60 - 1, totalMinutes));
   const hour = Math.floor(safeMinutes / 60);
@@ -575,7 +574,7 @@ function minutesToInputTime(totalMinutes) {
 }
 
 
-// quick note: this function handles g et vi si bl ed ay s.
+//days shown on the calendar
 function getVisibleDays() {
   if (calendarSettings.weekendMode === "both") {
     return allCalendarDays;
@@ -593,7 +592,7 @@ function getVisibleDays() {
 }
 
 
-// quick note: this function handles b ui ld de vo ti on al cl as si te m.
+//byui devotional event
 function buildDevotionalClassItem() {
   return {
     course_number: "BYUI Devotional",
@@ -611,7 +610,7 @@ function buildDevotionalClassItem() {
 }
 
 
-// quick note: this function handles m ak ec al en da ri nf o.
+//calendar information
 function makeCalendarInfo(classList) {
   const classesByDay = splitClassesByDay(classList);
   if (calendarSettings.showDevotional) {
@@ -674,7 +673,7 @@ function makeCalendarInfo(classList) {
 }
 
 
-// quick note: this function handles m ak et im es id e.
+//time labels
 function makeTimeSide(firstMinute, lastMinute, pixelsPerMinute) {
   const timeBox = document.createElement("div");
   timeBox.className = "calendar-times";
@@ -691,7 +690,7 @@ function makeTimeSide(firstMinute, lastMinute, pixelsPerMinute) {
 }
 
 
-// quick note: this function handles a dd ho ur li ne s.
+//calendar hour lines
 function addHourLines(trackBox, firstMinute, lastMinute, pixelsPerMinute) {
   for (let minuteMark = firstMinute; minuteMark <= lastMinute; minuteMark += 15) {
     const lineBox = document.createElement("div");
@@ -704,7 +703,7 @@ function addHourLines(trackBox, firstMinute, lastMinute, pixelsPerMinute) {
 }
 
 
-// quick note: this function handles m ea su re cl as sc ar dh ei gh t.
+//class card height
 function measureClassCardHeight(cardBox) {
   const cardStyle = window.getComputedStyle(cardBox);
   const minimumHeight = parseFloat(cardStyle.minHeight) || 0;
@@ -715,7 +714,7 @@ function measureClassCardHeight(cardBox) {
 }
 
 
-// quick note: this function handles f or ma tc ou rs es ec ti on la be l.
+//course section label
 function formatCourseSectionLabel(courseNumber, sectionNumber) {
   const courseText = String(courseNumber || "").trim();
   const sectionText = String(sectionNumber || "").trim();
@@ -771,7 +770,7 @@ function formatCourseSectionLabel(courseNumber, sectionNumber) {
 }
 
 
-// quick note: this function handles g et re ad ab le te xt co lo r.
+//text color for events
 function getReadableTextColor(hexColor, fallbackColor = "#0e3b2e") {
   const cleanHex = String(hexColor || "").replace("#", "").trim();
   if (!/^[0-9a-fA-F]{6}$/.test(cleanHex)) {
@@ -786,7 +785,7 @@ function getReadableTextColor(hexColor, fallbackColor = "#0e3b2e") {
 }
 
 
-// quick note: this function handles d ar ke nh ex co lo r.
+//darker event color
 function darkenHexColor(hexColor, amount = 34, fallbackColor = "#2f7d67") {
   const cleanHex = String(hexColor || "").replace("#", "").trim();
   if (!/^[0-9a-fA-F]{6}$/.test(cleanHex)) {
@@ -801,7 +800,7 @@ function darkenHexColor(hexColor, amount = 34, fallbackColor = "#2f7d67") {
 }
 
 
-// quick note: this function handles c le ar pe nd in gd el et ed ev en t.
+//clears deleted event
 function clearPendingDeletedEvent() {
   lastDeletedCustomEvent = null;
 
@@ -812,7 +811,7 @@ function clearPendingDeletedEvent() {
 }
 
 
-// quick note: this function handles s to re de le te de ve nt fo ru nd o.
+//undo deleted event
 function storeDeletedEventForUndo(eventItem) {
   clearPendingDeletedEvent();
   lastDeletedCustomEvent = { ...eventItem };
@@ -828,7 +827,7 @@ function storeDeletedEventForUndo(eventItem) {
 }
 
 
-// quick note: this function handles r es to re la st de le te de ve nt.
+//restores deleted event
 function restoreLastDeletedEvent() {
   if (!lastDeletedCustomEvent) {
     return;
@@ -841,7 +840,7 @@ function restoreLastDeletedEvent() {
 }
 
 
-// quick note: this function handles a dj us tc al en da rz oo m.
+//calendar zoom
 function adjustCalendarZoom(delta) {
   const nextZoom = Math.max(calendarZoomMin, Math.min(calendarZoomMax, calendarZoom + delta));
   if (Math.abs(nextZoom - calendarZoom) < 0.001) {
@@ -853,7 +852,7 @@ function adjustCalendarZoom(delta) {
 }
 
 
-// quick note: this function handles r un pr in ts ch ed ul e.
+//prints the calendar
 function runPrintSchedule() {
   const calendarBoard = document.querySelector("#scheduleGrid .calendar-board");
   if (!calendarBoard) {
@@ -869,7 +868,7 @@ function runPrintSchedule() {
 }
 
 
-// quick note: this function handles c le ar sc he du le da le rt by id.
+//removes one alert
 function clearScheduledAlertById(alertId) {
   const alertItem = scheduledEventAlerts.find(oneAlert => oneAlert.id === alertId);
   if (alertItem && alertItem.timeoutId !== null) {
@@ -880,7 +879,7 @@ function clearScheduledAlertById(alertId) {
 }
 
 
-// quick note: this function handles c le ar sc he du le da le rt sf or ev en t.
+//removes alerts for one event
 function clearScheduledAlertsForEvent(eventId) {
   scheduledEventAlerts
     .filter(oneAlert => oneAlert.eventId === eventId)
@@ -894,7 +893,7 @@ function clearScheduledAlertsForEvent(eventId) {
 }
 
 
-// quick note: this function handles c le ar al ls ch ed ul ed al er ts.
+//removes all alerts
 function clearAllScheduledAlerts() {
   scheduledEventAlerts.forEach(oneAlert => {
     if (oneAlert.timeoutId !== null) {
@@ -906,7 +905,7 @@ function clearAllScheduledAlerts() {
 }
 
 
-// quick note: this function handles g et ne xt ev en td at e.
+//next event date
 function getNextEventDate(dayName, startMinutes) {
   const now = new Date();
   const targetDay = reminderDayToIndex[dayName];
@@ -929,7 +928,7 @@ function getNextEventDate(dayName, startMinutes) {
 }
 
 
-// quick note: this function handles m ak ec ou rs ew or ke ve nt sf or sc he du le.
+//adds work hours around classes
 function makeCourseWorkEventsForSchedule(classList) {
   if (schedulerMode !== "course") {
     return [];
@@ -1010,7 +1009,7 @@ function makeCourseWorkEventsForSchedule(classList) {
 }
 
 
-// quick note: this function handles s ch ed ul ee ve nt al er tf or ev en t.
+//sets event reminder
 function scheduleEventAlertForEvent(eventItem, minutesBefore) {
   const nextEventDate = getNextEventDate(eventItem.day, eventItem.start);
   if (!nextEventDate) {
@@ -1049,7 +1048,7 @@ function scheduleEventAlertForEvent(eventItem, minutesBefore) {
 }
 
 
-// quick note: this function handles m ak ec la ss ca rd.
+//calendar class card
 function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
   const cardBox = document.createElement("article");
   const cardTop = (classItem.start - firstMinute) * pixelsPerMinute;
@@ -1105,7 +1104,7 @@ function makeClassCard(classItem, firstMinute, pixelsPerMinute) {
 }
 
 
-// quick note: this function handles m ak ed ay co lu mn.
+//calendar day
 function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinute, pixelsPerMinute) {
   const dayBox = document.createElement("section");
   dayBox.className = "calendar-day";
@@ -1233,7 +1232,7 @@ function makeDayColumn(dayName, classesByDay, totalHeight, firstMinute, lastMinu
   return dayBox;
 }
 
-// quick note: this function handles s ho wc al en da r.
+//shows the calendar
 function showCalendar(classList) {
   const box = byId("scheduleGrid");
   box.innerHTML = "";
@@ -1825,7 +1824,7 @@ function showCalendar(classList) {
 }
 
 
-// quick note: this function handles r en de rc ur re nt sc he du le.
+//updates the current schedule
 function renderCurrentSchedule() {
   const classList = schedules[currentScheduleIndex] || [];
   showChosenClasses(classList);
@@ -1833,7 +1832,7 @@ function renderCurrentSchedule() {
 }
 
 
-// quick note: this function handles r er en de ro nr es iz e.
+//updates calendar on resize
 function rerenderOnResize() {
   if (!schedules.length) {
     return;
@@ -1842,7 +1841,7 @@ function rerenderOnResize() {
   renderCurrentSchedule();
 }
 
-// quick note: this function handles r en de rs ch ed ul eb ut to ns.
+//schedule buttons
 function renderScheduleButtons() {
   const box = byId("scheduleOptions");
   box.innerHTML = "";
@@ -1881,7 +1880,7 @@ function renderScheduleButtons() {
 }
 
 
-// quick note: this function handles r ea ds ch ed ul ed at a.
+//reads server response
 async function readScheduleData(serverResponse) {
   const contentType = serverResponse.headers.get("content-type") || "";
 
@@ -1893,7 +1892,7 @@ async function readScheduleData(serverResponse) {
 }
 
 
-// quick note: this function handles s ho ws ch ed ul ee rr or.
+//schedule error
 function showScheduleError(message) {
   byId("requestMessage").textContent = message;
   clearScheduleUi();
@@ -1901,14 +1900,14 @@ function showScheduleError(message) {
 }
 
 
-// quick note: this function handles c le ar te ac he ru i.
+//clears teacher search
 function clearTeacherUi() {
   byId("teacherMessage").textContent = "";
   byId("teacherResults").innerHTML = "";
 }
 
 
-// quick note: this function handles r en de rt ea ch er re su lt s.
+//teacher search results
 function renderTeacherResults(teacherList) {
   const messageBox = byId("teacherMessage");
   const resultsBox = byId("teacherResults");
@@ -1949,7 +1948,7 @@ function renderTeacherResults(teacherList) {
 }
 
 
-// quick note: this function handles a pp ly se rv er sc he du le s.
+//adds schedules from the server
 function applyServerSchedules(serverData, appendMode, preserveLockedSections) {
   const loadedSchedules = serverData.valid_schedules || [];
 
@@ -1989,7 +1988,7 @@ function applyServerSchedules(serverData, appendMode, preserveLockedSections) {
   renderCurrentSchedule();
 }
 
-// quick note: this function handles r un sc he du le se ar ch.
+//finds schedules
 async function runScheduleSearch() {
   const typedClasses = getTypedClasses();
   const chosenTerm = getTermNumber();
@@ -2258,186 +2257,8 @@ function setSchedulerMode(nextMode) {
   }
 
   const showCourse = nextMode === "course";
-  const showWork = nextMode === "work";
   byId("courseHero").hidden = !showCourse;
-  byId("workHero").hidden = !showWork;
-
-  byId("selectedHeader").textContent = nextMode === "work"
-    ? "Scheduled Shifts"
-    : "Selected Classes";
-}
-
-
-// quick note: this function handles m ak ew or kd ay ch ip s.
-function makeWorkDayChips(selectedDays = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"])) {
-  const chipList = [];
-
-  allCalendarDays.forEach(dayName => {
-    const isSelected = selectedDays.has(dayName);
-    chipList.push(`<button type="button" class="work-day-chip${isSelected ? " active" : ""}" data-day="${dayName}">${dayName.slice(0, 1)}</button>`);
-  });
-
-  return chipList.join("");
-}
-
-
-// quick note: this function handles a dd em pl oy ee ro w.
-function addEmployeeRow(defaultData = {}) {
-  const employeeList = byId("employeeList");
-  const rowId = `workEmployee${workEmployeeRowIdCounter}`;
-  workEmployeeRowIdCounter += 1;
-
-  const selectedDays = new Set(defaultData.days || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
-  const rowBox = document.createElement("section");
-  rowBox.className = "work-employee-row";
-  rowBox.dataset.rowId = rowId;
-  rowBox.innerHTML = `
-    <h3>Employee</h3>
-    <div class="work-employee-fields">
-      <label class="calendar-options-field" for="${rowId}Name">
-        <span>Employee Name</span>
-        <input id="${rowId}Name" class="work-name" type="text" placeholder="Employee name" value="${defaultData.name || ""}" />
-      </label>
-      <label class="calendar-options-field" for="${rowId}Preferred">
-        <span>Preferred Hours</span>
-        <input id="${rowId}Preferred" class="work-hours" type="number" min="1" max="80" step="1" value="${defaultData.preferredHours || 20}" />
-      </label>
-      <label class="calendar-options-field" for="${rowId}Start">
-        <span>Availability Start</span>
-        <input id="${rowId}Start" class="work-start" type="time" step="60" value="${defaultData.start || "09:00"}" />
-      </label>
-      <label class="calendar-options-field" for="${rowId}End">
-        <span>Availability End</span>
-        <input id="${rowId}End" class="work-end" type="time" step="60" value="${defaultData.end || "17:00"}" />
-      </label>
-    </div>
-    <div class="work-days-row">
-      <span>Availability Days</span>
-      <div class="work-day-chips">${makeWorkDayChips(selectedDays)}</div>
-      <button type="button" class="btn-main work-remove-btn">Remove</button>
-    </div>
-  `;
-
-  rowBox.querySelectorAll(".work-day-chip").forEach(dayButton => {
-    dayButton.addEventListener("click", () => {
-      dayButton.classList.toggle("active");
-    });
-  });
-
-  const removeButton = rowBox.querySelector(".work-remove-btn");
-  removeButton.addEventListener("click", () => {
-    rowBox.remove();
-  });
-
-  employeeList.appendChild(rowBox);
-}
-
-
-// quick note: this function handles p ar se em pl oy ee ro ws.
-function parseEmployeeRows() {
-  const rows = [...document.querySelectorAll(".work-employee-row")];
-  return rows.map(rowBox => {
-    const name = rowBox.querySelector(".work-name").value.trim();
-    const preferredHours = Number.parseInt(rowBox.querySelector(".work-hours").value, 10);
-    const startMinutes = parseTimeInputToMinutes(rowBox.querySelector(".work-start").value);
-    const endMinutes = parseTimeInputToMinutes(rowBox.querySelector(".work-end").value);
-    const selectedDays = [...rowBox.querySelectorAll(".work-day-chip.active")].map(button => button.dataset.day);
-
-    return {
-      name,
-      preferredHours,
-      startMinutes,
-      endMinutes,
-      selectedDays
-    };
-  });
-}
-
-
-// quick note: this function handles r un wo rk sc he du le ge ne ra ti on.
-function runWorkScheduleGeneration() {
-  const employees = parseEmployeeRows();
-  if (!employees.length) {
-    byId("workMessage").textContent = "Add at least one employee.";
-    return;
-  }
-
-  const generatedEvents = [];
-  const employeeColorMap = new Map();
-  const dayNextStart = { Mon: null, Tue: null, Wed: null, Thu: null, Fri: null, Sat: null, Sun: null };
-  let colorIndex = 0;
-
-  for (const employee of employees) {
-    if (!employee.name) {
-      byId("workMessage").textContent = "Each employee needs a name.";
-      return;
-    }
-
-    if (!employee.selectedDays.length) {
-      byId("workMessage").textContent = `Choose at least one availability day for ${employee.name}.`;
-      return;
-    }
-
-    if (employee.startMinutes === null || employee.endMinutes === null || employee.endMinutes <= employee.startMinutes) {
-      byId("workMessage").textContent = `Enter valid availability times for ${employee.name}.`;
-      return;
-    }
-
-    if (!Number.isInteger(employee.preferredHours) || employee.preferredHours <= 0) {
-      byId("workMessage").textContent = `Enter preferred weekly hours for ${employee.name}.`;
-      return;
-    }
-
-    const preferredMinutes = employee.preferredHours * 60;
-    const perDayTarget = Math.max(60, Math.floor(preferredMinutes / employee.selectedDays.length));
-
-    if (!employeeColorMap.has(employee.name)) {
-      employeeColorMap.set(employee.name, presetEventColors[colorIndex % presetEventColors.length]);
-      colorIndex += 1;
-    }
-    const employeeColor = employeeColorMap.get(employee.name);
-
-    for (const dayName of employee.selectedDays) {
-      const availableMinutes = employee.endMinutes - employee.startMinutes;
-      const shiftMinutes = Math.min(availableMinutes, perDayTarget);
-      const candidateStart = dayNextStart[dayName] === null
-        ? employee.startMinutes
-        : Math.max(employee.startMinutes, dayNextStart[dayName]);
-      const shiftStart = Math.min(candidateStart, employee.endMinutes - 30);
-      const shiftEnd = Math.min(employee.endMinutes, shiftStart + shiftMinutes);
-
-      if (shiftEnd <= shiftStart) {
-        return;
-      }
-
-      generatedEvents.push({
-        eventId: nextCustomEventId,
-        course_number: employee.name,
-        section_number: "",
-        day: dayName,
-        start: shiftStart,
-        end: shiftEnd,
-        start_label: minutesToClock(shiftStart),
-        end_label: minutesToClock(shiftEnd),
-        teacher_name: `Preferred ${employee.preferredHours}h/week`,
-          eventColor: employeeColor
-      });
-      nextCustomEventId += 1;
-      dayNextStart[dayName] = Math.min(employee.endMinutes, shiftEnd + 10);
-    }
-  }
-
-  customCalendarEvents = generatedEvents;
-  clearPendingDeletedEvent();
-  clearAllScheduledAlerts();
-  schedules = [[]];
-  currentScheduleIndex = 0;
-  hasMoreSchedules = false;
-  byId("workMessage").textContent = `Generated ${generatedEvents.length} shift(s).`;
-  byId("requestMessage").textContent = "Work schedule ready.";
-  toggleResultsPanel(true);
-  renderScheduleButtons();
-  renderCurrentSchedule();
+  byId("selectedHeader").textContent = "Selected Classes";
 }
 
 
@@ -2476,16 +2297,6 @@ async function runTeacherSearch() {
     byId("teacherMessage").textContent = `Could not reach the scheduler API. Details: ${error.message}`;
   }
 }
-
-
-// quick note: this function handles e ns ur ew or ke mp lo ye er ow s.
-function ensureWorkEmployeeRows() {
-  if (!document.querySelector(".work-employee-row")) {
-    addEmployeeRow();
-  }
-}
-
-
 byId("welcomeCourseBtn").addEventListener("click", () => {
   setSchedulerMode("course");
 });
@@ -2510,12 +2321,6 @@ if (topWorkButton) {
     window.location.href = "./WorkScheduler.html";
   });
 }
-
-byId("addEmployeeBtn").addEventListener("click", () => addEmployeeRow());
-byId("getWorkScheduleBtn").addEventListener("click", () => {
-  window.location.href = "./WorkScheduler.html";
-});
-
 
 byId("termBtn").addEventListener("click", () => {
   const panelBox = byId("termPanel");

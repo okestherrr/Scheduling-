@@ -1,0 +1,18 @@
+@import "./homepage.css";
+
+/*employee page*/
+#employeeHero {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+/*employee messages*/
+#employeeMessage {
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+
+/*employee action buttons*/
+.work-actions-row {
+  justify-content: space-between;
+}

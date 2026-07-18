@@ -1,3 +1,4 @@
+/*color variables*/
 :root {
   --page-color: #e9f5f8;
   --box-color: rgba(245, 252, 255, 0.92);
@@ -16,6 +17,7 @@
   box-sizing: border-box;
 }
 
+/*page layout*/
 body {
   margin: 0;
   min-height: 100vh;
@@ -39,6 +41,7 @@ body {
   margin-bottom: 12px;
 }
 
+/*home page*/
 .welcome-screen {
   text-align: center;
 }
@@ -91,23 +94,6 @@ a.mode-switch-btn {
   margin-bottom: 10px;
 }
 
-.work-step-tabs {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0 12px;
-  flex-wrap: wrap;
-}
-
-.work-step-btn {
-  background: #e7f8fd;
-  color: #0d6074;
-}
-
-.work-step-btn.active {
-  background: #0f6f88;
-  color: #ffffff;
-}
-
 .work-title-row,
 .work-panel-title-row {
   display: flex;
@@ -143,6 +129,7 @@ a.mode-switch-btn {
   gap: 8px;
 }
 
+/*staffing*/
 .work-constraints-panel,
 .work-staffing-panel {
   margin-top: 12px;
@@ -448,33 +435,6 @@ a.mode-switch-btn {
   display: inline-block;
 }
 
-.work-master-grid {
-  min-width: 860px;
-  border: 1px solid #c7d9df;
-}
-
-.work-master-row {
-  display: grid;
-  grid-template-columns: 180px repeat(7, minmax(96px, 1fr));
-}
-
-.work-master-header {
-  background: #edf7fb;
-  font-weight: 700;
-}
-
-.work-master-cell {
-  border-right: 1px solid #d5e4ea;
-  border-bottom: 1px solid #d5e4ea;
-  padding: 8px;
-  min-height: 52px;
-}
-
-.work-master-row .work-master-cell:last-child,
-.work-master-header .work-master-cell:last-child {
-  border-right: none;
-}
-
 .employee-cell {
   background: #f7fcff;
 }
@@ -619,6 +579,7 @@ a.mode-switch-btn {
   text-underline-offset: 2px;
 }
 
+/*calendar options*/
 .calendar-workhours-panel {
   margin: 10px 0 14px;
   padding: 12px;
@@ -774,6 +735,7 @@ button {
   box-shadow: none;
 }
 
+/*buttons*/
 .btn-main {
   padding: 11px 14px;
   border: none;
@@ -842,6 +804,7 @@ button {
   gap: 10px;
 }
 
+/*teacher search*/
 .teacher-card {
   border: 1px solid #9fcfd9;
   border-radius: 14px;
@@ -1493,6 +1456,7 @@ h2 {
   background: #7ad4e9;
 }
 
+/*calendar*/
 .calendar-board {
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr);
@@ -1674,6 +1638,7 @@ h2 {
   display: inline-flex;
 }
 
+/*mobile layout*/
 @media (max-width: 900px) {
   .work-employee-fields {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
@@ -1685,10 +1650,6 @@ h2 {
 
   .shift-template-row {
     grid-template-columns: repeat(2, minmax(120px, 1fr));
-  }
-
-  .work-master-row {
-    grid-template-columns: 150px repeat(7, minmax(90px, 1fr));
   }
 
   .work-shift-bar {
@@ -1941,6 +1902,7 @@ button,
   }
 }
 
+/*print layout*/
 @media print {
   body.print-calendar-only * {
     visibility: hidden !important;
@@ -1967,9 +1929,6 @@ button,
     display: none !important;
   }
 
-  body.print-calendar-only .work-step-tabs,
-  body.print-calendar-only #workEmployeeStep,
-  body.print-calendar-only #workTemplateStep,
   body.print-calendar-only #workMessage,
   body.print-calendar-only #requestMessage,
   body.print-calendar-only .work-roster-actions,

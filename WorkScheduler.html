@@ -2,72 +2,32 @@
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Work Scheduler</title>
-    <link rel="stylesheet" href="./homepage.css" />
-    <script src="./workScheduler.js" defer></script>
+    <title>Employee Details</title>
+    <link rel="stylesheet" href="./employeeDetails.css" />
+    <script src="./employeeDetails.js" defer></script>
   </head>
   <body>
     <main class="page-shell">
       <div class="top-home-row">
         <a class="btn-main mode-switch-btn" href="./homepage.html">Home</a>
         <a class="btn-main mode-switch-btn" href="./homepage.html?view=course">Course Scheduling</a>
+        <a class="btn-main mode-switch-btn" href="./ShiftDetails.html">Shift Details</a>
       </div>
 
-      <section class="hero" id="workHero">
+      <section class="hero" id="employeeHero">
         <div class="work-title-row">
-          <h1>Work Scheduler</h1>
-          <button id="workTestingEmployeesBtn" class="btn-main work-link-btn" type="button">Testing</button>
+          <h1>Employee Details</h1>
+          <button id="employeeTestingBtn" class="btn-main work-link-btn" type="button">Testing</button>
         </div>
-        <p>First add employees and add shift details then push get schedule.</p>
+        <p>Add employees first, then continue to Shift Details to generate the schedule.</p>
 
-        <div class="work-step-tabs">
-          <button id="workStepEmployeesBtn" class="btn-main work-step-btn active" type="button">Employees Details</button>
-          <button id="workStepTemplatesBtn" class="btn-main work-step-btn" type="button">Shift Details</button>
+        <div id="employeeList"></div>
+        <div class="request-row work-actions-row">
+          <button id="addEmployeeBtn" class="btn-main work-link-btn" type="button">Add person</button>
+          <button id="goToShiftDetailsBtn" class="btn-main" type="button">Next: Shift Details</button>
         </div>
 
-        <section id="workEmployeeStep">
-          <div id="employeeList"></div>
-          <div class="request-row work-actions-row">
-            <button id="addEmployeeBtn" class="btn-main work-link-btn" type="button">Add person</button>
-            <button id="workNextBtn" class="btn-main" type="button">Next</button>
-          </div>
-        </section>
-
-        <section id="workTemplateStep" hidden>
-          <section class="work-constraints-panel">
-            <h3>Work Details</h3>
-            <div class="work-constraints-grid">
-              <label class="calendar-options-field" for="workBusinessStart">
-                <span>Shifts start:</span>
-                <input id="workBusinessStart" type="time" step="60" />
-              </label>
-              <label class="calendar-options-field" for="workBusinessEnd">
-                <span>Shifts end:</span>
-                <input id="workBusinessEnd" type="time" step="60" />
-              </label>
-            </div>
-          </section>
-
-          <section class="work-staffing-panel">
-            <div class="work-panel-title-row">
-              <h3>Shift Details</h3>
-            </div>
-            <p class="work-staffing-copy">Example: Morning 9:00 AM-1:00 PM needs 2 employees, Afternoon 1:00 PM-5:00 PM needs 3 employees.</p>
-            <div id="shiftTemplateList"></div>
-          </section>
-
-          <div class="request-row work-actions-row work-template-actions-row">
-            <button id="getWorkScheduleBtn" class="btn-main" type="button">Get Schedule</button>
-          </div>
-        </section>
-
-        <p id="workMessage"></p>
-      </section>
-
-      <section class="results-panel">
-        <div id="scheduleGrid"></div>
-        <div id="staffingCoverage" class="work-coverage-panel" hidden></div>
-        <div id="workTotals" class="work-totals-panel" hidden></div>
+        <p id="employeeMessage"></p>
       </section>
     </main>
   </body>

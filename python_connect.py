@@ -33,7 +33,7 @@ for course_number in courses['course_number']:
         class_codes.append(upper_code)
 
 
-# quick note: this function handles n or ma li ze co ur se co de.
+#normalizes the course code
 def normalizeCourseCode(code_text):
     return re.sub(r"[^A-Z0-9]", "", str(code_text).upper())
 
@@ -47,13 +47,13 @@ for saved_code in class_codes:
 
 
 @app.route("/")
-# quick note: this function handles h om e.
+#homepage
 def home():
     return app.send_static_file("homepage.html")
 
 
 @app.after_request
-# quick note: this function handles a dd c or s h ea de rs.
+#cors settings
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
@@ -61,14 +61,14 @@ def add_cors_headers(response):
     return response
 
 
-# quick note: this function handles m ak eb ad re qu es t.
+#returns a bad request message
 def makeBadRequest(message, **extra_fields):
     payload = {"error": message}
     payload.update(extra_fields)
     return jsonify(payload), 400
 
 
-# quick note: this function handles r ea dj so nb od y.
+#reads the json request
 def readJsonBody(default_empty=False):
     body = request.get_json(silent=True)
 
@@ -81,13 +81,13 @@ def readJsonBody(default_empty=False):
     return body
 
 
-# quick note: this function handles t im et ex tt om in ut es.
+#turns time into minutes
 def timeTextToMinutes(time_text):
     parts = str(time_text).split(':')
     return int(parts[0]) * 60 + int(parts[1])
 
 
-# quick note: this function handles t im et ex tt ol ab el.
+#formats the time
 def timeTextToLabel(time_text):
     if pd.isna(time_text):
         return None
@@ -107,14 +107,14 @@ def timeTextToLabel(time_text):
     return str(hour) + ":" + str(minute).zfill(2) + " " + period
 
 
-# quick note: this function handles c le an ce ll.
+#removes empty values
 def cleanCell(value):
     if pd.isna(value):
         return None
     return value
 
 
-# quick note: this function handles c la ss es co nf li ct.
+#checks if two classes overlap
 def classesConflict(first_day, first_start, first_end, second_day, second_start, second_end):
     if pd.isna(first_day) or pd.isna(second_day):
         return False
@@ -150,7 +150,7 @@ def classesConflict(first_day, first_start, first_end, second_day, second_start,
     return not classes_do_not_overlap
 
 
-# quick note: this function handles s ch ed ul eh as co nf li ct.
+#checks the whole schedule for conflicts
 def scheduleHasConflict(schedule_list):
     for i in range(len(schedule_list)):
         for j in range(i+1, len(schedule_list)):
@@ -164,7 +164,7 @@ def scheduleHasConflict(schedule_list):
     return False
 
 
-# quick note: this function handles s ec ti on to js on.
+#section information
 def sectionToJson(section):
     return {
         "course_number": cleanCell(section["course_number"]),
@@ -182,7 +182,7 @@ def sectionToJson(section):
     }
 
 
-# quick note: this function handles c ou rs et oj so n.
+#course information
 def courseToJson(course):
     return {
         "course_number": cleanCell(course["course_number"]),
@@ -191,7 +191,7 @@ def courseToJson(course):
     }
 
 
-# quick note: this function handles r ea dt er mn um be r.
+#reads the term number
 def readTermNumber(raw_term):
     if raw_term is None or raw_term == "":
         return None, None
@@ -202,7 +202,7 @@ def readTermNumber(raw_term):
         return None, "'term' must be a whole number."
 
 
-# quick note: this function handles r ea dp ag in gv al ue s.
+#reads the page settings
 def readPagingValues(raw_start_index, raw_page_size):
     try:
         start_index = int(raw_start_index if raw_start_index is not None else 0)
@@ -226,7 +226,7 @@ def readPagingValues(raw_start_index, raw_page_size):
     return start_index, page_size, None
 
 
-# quick note: this function handles r ea dl oc ke ds ec ti on s.
+#reads locked sections
 def readLockedSections(raw_locked_sections):
     if raw_locked_sections is None:
         return {}, None
@@ -258,7 +258,7 @@ def readLockedSections(raw_locked_sections):
     return locked_map, None
 
 
-# quick note: this function handles t ea ch er cl as st oj so n.
+#teacher class information
 def teacherClassToJson(section):
     day_text = cleanCell(section["day"])
     start_time = cleanCell(section["start_time"])
@@ -284,7 +284,7 @@ def teacherClassToJson(section):
     }
 
 
-# quick note: this function handles b ui ld te ac he rl is t.
+#builds the teacher list
 def buildTeacherList(query_text, term_filter):
     teacher_table = merged_rows.copy()
 
@@ -320,7 +320,7 @@ def buildTeacherList(query_text, term_filter):
     return teacher_items
 
 
-# quick note: this function handles f in dc ou rs ec od e.
+#finds the course code
 def findCourseCode(user_text):
     class_code = user_text.strip().upper()
     normalized_input = normalizeCourseCode(class_code)
@@ -349,7 +349,7 @@ def findCourseCode(user_text):
     return None, "missing", None
 
 
-# quick note: this function handles d ed up ec ou rs ec od es.
+#removes duplicate course codes
 def dedupeCourseCodes(code_list):
     unique_codes = []
 
@@ -360,7 +360,7 @@ def dedupeCourseCodes(code_list):
     return unique_codes
 
 
-# quick note: this function handles v al id at er eq ue st ed co ur se s.
+#checks requested courses
 def validateRequestedCourses(requested_codes):
     good_codes = []
     unclear_codes = []
@@ -404,7 +404,7 @@ def validateRequestedCourses(requested_codes):
     return dedupeCourseCodes(good_codes), None
 
 
-# quick note: this function handles g et se ct io ns fo rc ou rs es.
+#gets sections for each course
 def getSectionsForCourses(code_list, term_filter, locked_sections):
     sections_for_each_code = {}
     missing_codes = []
@@ -432,7 +432,7 @@ def getSectionsForCourses(code_list, term_filter, locked_sections):
     return sections_for_each_code, missing_codes
 
 
-# quick note: this function handles f in dv al id sc he du le s.
+#finds schedules without conflicts
 def findValidSchedules(sections_for_each_code, start_index, page_size):
     valid_schedules_page = []
     checked_schedule_count = 0
@@ -469,7 +469,7 @@ def findValidSchedules(sections_for_each_code, start_index, page_size):
     return valid_schedules_page, has_more
 
 
-# quick note: this function handles s ch ed ul es to js on.
+#schedule information
 def schedulesToJson(schedule_list):
     ready_schedules = []
 
@@ -483,7 +483,7 @@ def schedulesToJson(schedule_list):
 
 
 @app.route("/courses", methods=["GET"])
-# quick note: this function handles g et c ou rs es.
+#gets all courses
 def get_courses():
     course_items = []
 
@@ -494,13 +494,13 @@ def get_courses():
     return jsonify({"courses": course_items})
 
 
-# quick note: this function handles s or tc ou rs ei te m.
+#sorts course numbers
 def sortCourseItem(course_item):
     return str(course_item["course_number"])
 
 
 @app.route("/schedule", methods=["POST", "OPTIONS"])
-# quick note: this function handles b ui ld sc he du le.
+#builds the schedule
 def buildSchedule():
     if request.method == "OPTIONS":
         return ("", 204)
@@ -564,7 +564,7 @@ def buildSchedule():
 
 
 @app.route("/teachers/search", methods=["POST", "OPTIONS"])
-# quick note: this function handles f in dt ea ch er s.
+#finds matching teachers
 def findTeachers():
     if request.method == "OPTIONS":
         return ("", 204)
