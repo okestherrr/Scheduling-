@@ -6,7 +6,7 @@
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
       "args": [
-        "python_connect.py"
+        "Components\\python_connect.py"
       ],
       "options": {
         "cwd": "${workspaceFolder}"

@@ -24,7 +24,7 @@ function loadSavedEmployees() {
 function initShiftDetailsPage() {
   //goes back to employee details
   byId("editEmployeesBtn")?.addEventListener("click", () => {
-    window.location.href = "./WorkScheduler.html";
+    window.location.href = "../Employee Details/WorkScheduler.html";
   });
 
   //default business hours

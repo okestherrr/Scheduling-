@@ -172,7 +172,6 @@ const calendarZoomStep = 0.2;
 let selectedEventColor = presetEventColors[8];
 let scheduledEventAlerts = [];
 let nextScheduledAlertId = 1;
-let schedulerMode = "course";
 let alertPanelOpen = false;
 let activePaletteCloseListener = null;
 let workHoursPanelOpen = false;
@@ -930,10 +929,6 @@ function getNextEventDate(dayName, startMinutes) {
 
 //adds work hours around classes
 function makeCourseWorkEventsForSchedule(classList) {
-  if (schedulerMode !== "course") {
-    return [];
-  }
-
   const targetMinutes = Math.max(0, Number(workHoursSettings.targetHours || 0) * 60);
   if (targetMinutes <= 0 || !workHoursSettings.days.size) {
     return [];
@@ -1282,9 +1277,7 @@ function showCalendar(classList) {
   });
 
   calendarActions.appendChild(optionsButton);
-  if (schedulerMode === "course") {
-    calendarActions.appendChild(workHoursButton);
-  }
+  calendarActions.appendChild(workHoursButton);
   calendarActions.appendChild(printButton);
   calendarActions.appendChild(favoriteButton);
 
@@ -1662,7 +1655,7 @@ function showCalendar(classList) {
     });
   }
 
-  if (schedulerMode === "course" && workHoursPanelOpen) {
+  if (workHoursPanelOpen) {
     const workHoursPanel = document.createElement("section");
     workHoursPanel.className = "calendar-workhours-panel";
     workHoursPanel.innerHTML = `
@@ -2213,55 +2206,6 @@ function clearActivePaletteListener() {
 }
 
 
-// quick note: this function handles s ho ww el co me sc re en.
-function showWelcomeScreen() {
-  byId("welcomeScreen").hidden = false;
-  byId("appShell").hidden = true;
-  const topHomeButton = byId("topHomeBtn");
-  const topCourseButton = byId("topCourseBtn");
-  const topWorkButton = byId("topWorkBtn");
-  if (topHomeButton) {
-    topHomeButton.hidden = true;
-  }
-  if (topCourseButton) {
-    topCourseButton.hidden = false;
-  }
-  if (topWorkButton) {
-    topWorkButton.hidden = false;
-  }
-  clearActivePaletteListener();
-}
-
-
-// quick note: this function handles s et sc he du le rm od e.
-function setSchedulerMode(nextMode) {
-  if (nextMode === "work") {
-    window.location.href = "./WorkScheduler.html";
-    return;
-  }
-
-  schedulerMode = nextMode;
-  byId("welcomeScreen").hidden = true;
-  byId("appShell").hidden = false;
-  const topHomeButton = byId("topHomeBtn");
-  const topCourseButton = byId("topCourseBtn");
-  const topWorkButton = byId("topWorkBtn");
-  if (topHomeButton) {
-    topHomeButton.hidden = false;
-  }
-  if (topCourseButton) {
-    topCourseButton.hidden = true;
-  }
-  if (topWorkButton) {
-    topWorkButton.hidden = false;
-  }
-
-  const showCourse = nextMode === "course";
-  byId("courseHero").hidden = !showCourse;
-  byId("selectedHeader").textContent = "Selected Classes";
-}
-
-
 // quick note: this function handles r un te ac he rs ea rc h.
 async function runTeacherSearch() {
   const typedTeacher = byId("teacherRequest").value.trim();
@@ -2296,30 +2240,6 @@ async function runTeacherSearch() {
     clearTeacherUi();
     byId("teacherMessage").textContent = `Could not reach the scheduler API. Details: ${error.message}`;
   }
-}
-byId("welcomeCourseBtn").addEventListener("click", () => {
-  setSchedulerMode("course");
-});
-
-byId("welcomeWorkBtn").addEventListener("click", () => {
-  window.location.href = "./WorkScheduler.html";
-});
-
-const topHomeButton = byId("topHomeBtn");
-if (topHomeButton) {
-  topHomeButton.addEventListener("click", showWelcomeScreen);
-}
-
-const topCourseButton = byId("topCourseBtn");
-if (topCourseButton) {
-  topCourseButton.addEventListener("click", () => setSchedulerMode("course"));
-}
-
-const topWorkButton = byId("topWorkBtn");
-if (topWorkButton) {
-  topWorkButton.addEventListener("click", () => {
-    window.location.href = "./WorkScheduler.html";
-  });
 }
 
 byId("termBtn").addEventListener("click", () => {
@@ -2380,15 +2300,6 @@ toggleTermPanel(false);
 toggleLoadMoreBtn(false);
 toggleManipulateBtn(false);
 toggleResetBtn(false);
-
-const initialView = new URLSearchParams(window.location.search).get("view");
-if (initialView === "course") {
-  setSchedulerMode("course");
-} else if (initialView === "work") {
-  window.location.href = "./WorkScheduler.html";
-} else {
-  showWelcomeScreen();
-}
 
 window.addEventListener("resize", () => {
   if (calendarResizeTimer !== null) {

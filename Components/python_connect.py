@@ -4,7 +4,10 @@ from itertools import product
 import re
 from pathlib import Path
 
-app = Flask(__name__, static_folder=".", static_url_path="")
+COMPONENTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = COMPONENTS_DIR.parent
+
+app = Flask(__name__, static_folder=str(PROJECT_ROOT), static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 
 MAX_CLASSES_PER_SEARCH = 8
@@ -13,11 +16,11 @@ MAX_SCHEDULE_RESULTS = 5
 MAX_SCHEDULE_PAGE_SIZE = 25
 MINUTES_BETWEEN_CLASSES = 15
 
-BASE_DIR = Path(__file__).resolve().parent
+TABLES_DIR = PROJECT_ROOT / "Sql Tables"
 
-sections = pd.read_csv(BASE_DIR / "section.csv")
-courses = pd.read_csv(BASE_DIR / "course.csv")
-teachers = pd.read_csv(BASE_DIR / "teacher.csv")
+sections = pd.read_csv(TABLES_DIR / "section.csv")
+courses = pd.read_csv(TABLES_DIR / "course.csv")
+teachers = pd.read_csv(TABLES_DIR / "teacher.csv")
 
 sections.columns = sections.columns.str.strip()
 courses.columns = courses.columns.str.strip()
@@ -49,7 +52,7 @@ for saved_code in class_codes:
 @app.route("/")
 #homepage
 def home():
-    return app.send_static_file("homepage.html")
+    return app.send_static_file("Homepage/homepage.html")
 
 
 @app.after_request

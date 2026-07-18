@@ -1,0 +1,6 @@
+flask
+# runs the backend server and routes api
+pandas
+# reads csv files
+gunicorn
+# helpes deploy and run the program online

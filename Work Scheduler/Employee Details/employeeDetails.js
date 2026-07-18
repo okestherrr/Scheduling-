@@ -303,7 +303,7 @@ function initEmployeePage() {
     const saved = saveEmployeesToStorage();
 
     if (saved) {
-      window.location.href = "./ShiftDetails.html";
+      window.location.href = "../Shift Details/ShiftDetails.html";
     }
   });
 }
