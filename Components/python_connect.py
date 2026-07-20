@@ -47,24 +47,22 @@ def buildTeacherList(query_text, term_filter):
         teacher_table = teacher_table[
             teacher_table["teacher_name"].astype(str).str.lower().str.contains(lowered_query, na=False)
         ]
-    teacher_items = []
-    for teacher_name, group in teacher_table.groupby("teacher_name", sort=True):
-        first_row = group.iloc[0]
-        class_rows = []
-        for _, one_class in group.sort_values(
-            ["course_number", "term", "day", "start_time", "section_number"],
-            na_position="last"
-        ).iterrows():
-            class_rows.append(teacherClassToJson(one_class))
-        teacher_items.append({
+    return [
+        {
             "teacher_name": teacher_name,
-            "rmp_score": cleanCell(first_row["rmp_score"]),
-            "difficulty": cleanCell(first_row["difficulty"]),
-            "ideal": cleanCell(first_row["ideal"]),
-            "classes": class_rows
-        })
-
-    return teacher_items
+            "rmp_score": cleanCell(group.iloc[0]["rmp_score"]),
+            "difficulty": cleanCell(group.iloc[0]["difficulty"]),
+            "ideal": cleanCell(group.iloc[0]["ideal"]),
+            "classes": [
+                teacherClassToJson(one_class)
+                for _, one_class in group.sort_values(
+                    ["course_number", "term", "day", "start_time", "section_number"],
+                    na_position="last"
+                ).iterrows()
+            ]
+        }
+        for teacher_name, group in teacher_table.groupby("teacher_name", sort=True)
+    ]
 
 @app.route("/")
 #homepage
