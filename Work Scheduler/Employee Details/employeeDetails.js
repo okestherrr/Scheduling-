@@ -35,9 +35,11 @@ function addEmployeeRow(defaultData = {}) {
   if (!employeeList) {
     return;
   }
+
   const rowId = `workEmployee${employeeRowIdCounter}`;
   employeeRowIdCounter += 1;
   const selectedDays = new Set(defaultData.days || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
+
   const rowBox = document.createElement("section");
   rowBox.className = "work-employee-row";
   rowBox.dataset.rowId = rowId;
@@ -71,25 +73,30 @@ function addEmployeeRow(defaultData = {}) {
       <button type="button" class="btn-main work-remove-btn">Remove</button>
     </div>
   `;
+
   //selecting availability days
   rowBox.querySelectorAll(".work-day-chip").forEach(dayButton => {
     dayButton.addEventListener("click", () => {
       dayButton.classList.toggle("active");
     });
   });
+
   //removes employee
   rowBox.querySelector(".work-remove-btn").addEventListener("click", () => {
     rowBox.remove();
   });
+
   employeeList.appendChild(rowBox);
 }
 
 //employee information from the inputs
 function parseEmployeeRows() {
   const rows = [...document.querySelectorAll(".work-employee-row")];
+
   return rows.map(row => {
     const days = [...row.querySelectorAll(".work-day-chip.active")]
       .map(button => button.dataset.day);
+
     return {
       name: row.querySelector(".work-name").value.trim(),
       preferredHours: Number.parseInt(row.querySelector(".work-hours").value, 10),
@@ -104,6 +111,7 @@ function parseEmployeeRows() {
 //message shown to the user
 function showMessage(text) {
   const messageBox = byId("employeeMessage");
+
   if (messageBox) {
     messageBox.textContent = text;
   }
@@ -118,36 +126,45 @@ function failInputSave() {
 //checks and saves employee information
 function saveEmployeesToStorage() {
   const employees = parseEmployeeRows();
+
   if (!employees.length) {
     return failInputSave();
   }
+
   //checks each employee input
   for (const employee of employees) {
     if (!employee.name) {
       return failInputSave();
     }
+
     if (!employee.days.length) {
       return failInputSave();
     }
+
     if (!Number.isInteger(employee.preferredHours) || employee.preferredHours <= 0) {
       return failInputSave();
     }
+
     if (!Number.isInteger(employee.maxWeeklyHours) || employee.maxWeeklyHours <= 0) {
       return failInputSave();
     }
+
     if (employee.maxWeeklyHours < employee.preferredHours) {
       return failInputSave();
     }
+
     if (!employee.start || !employee.end || employee.end <= employee.start) {
       return failInputSave();
     }
   }
+
   //saves employees in the browser
   try {
     window.localStorage.setItem(
       WORK_EMPLOYEE_STORAGE_KEY,
       JSON.stringify(employees)
     );
+
     showMessage("Employees saved. Opening Shift Details...");
     return true;
   } catch (_error) {
@@ -160,9 +177,11 @@ function saveEmployeesToStorage() {
 function loadEmployeesFromStorage() {
   try {
     const raw = window.localStorage.getItem(WORK_EMPLOYEE_STORAGE_KEY);
+
     if (!raw) {
       return [];
     }
+
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch (_error) {
@@ -173,6 +192,7 @@ function loadEmployeesFromStorage() {
 //clears all employee rows
 function clearEmployeeRows() {
   const employeeList = byId("employeeList");
+
   if (employeeList) {
     employeeList.innerHTML = "";
   }
@@ -190,22 +210,28 @@ function sampleUniqueNames(count) {
     "Mason", "Elijah", "Sophia", "Amelia", "Lucas", "Harper",
     "James", "Isla", "Daniel", "Levi", "Grace", "Nora", "Logan"
   ];
+
   const lastNames = [
     "Bennett", "Carter", "Diaz", "Foster", "Green", "Hayes",
     "Irwin", "Jordan", "Khan", "Lopez", "Morris", "Nguyen",
     "Owens", "Patel", "Quinn", "Reed", "Sanchez", "Turner",
     "Vasquez", "Walker"
   ];
+
   const used = new Set();
   const names = [];
+
   while (names.length < count) {
     const full = `${firstNames[randomInt(0, firstNames.length - 1)]} ${lastNames[randomInt(0, lastNames.length - 1)]}`;
+
     if (used.has(full)) {
       continue;
     }
+
     used.add(full);
     names.push(full);
   }
+
   return names;
 }
 
@@ -213,27 +239,35 @@ function sampleUniqueNames(count) {
 function generateEmployeeTestingData() {
   const employeeCount = randomInt(6, 10);
   const names = sampleUniqueNames(employeeCount);
+
   clearEmployeeRows();
+
   names.forEach((name, index) => {
     const preferredHours = randomInt(18, 34);
     const maxWeeklyHours = randomInt(
       preferredHours,
       Math.min(40, preferredHours + 10)
     );
+
     const startHourOptions = [8, 9, 10, 11, 12];
     const startHour = startHourOptions[
       randomInt(0, startHourOptions.length - 1)
     ];
+
     const shiftSpanHours = randomInt(6, 10);
     const endHour = Math.min(23, startHour + shiftSpanHours);
+
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+
     //some employees can work weekends
     if (index % 3 === 0 && Math.random() > 0.4) {
       days.push("Sat");
     }
+
     if (index % 4 === 0 && Math.random() > 0.5) {
       days.push("Sun");
     }
+
     addEmployeeRow({
       name,
       preferredHours,
@@ -243,26 +277,32 @@ function generateEmployeeTestingData() {
       days
     });
   });
+
   showMessage("Testing data loaded for employees.");
 }
 
 //employee page buttons and saved information
 function initEmployeePage() {
   const savedEmployees = loadEmployeesFromStorage();
+
   if (savedEmployees.length) {
     savedEmployees.forEach(employee => addEmployeeRow(employee));
   } else {
     addEmployeeRow();
   }
+
   byId("addEmployeeBtn")?.addEventListener("click", () => {
     addEmployeeRow();
   });
+
   byId("employeeTestingBtn")?.addEventListener(
     "click",
     generateEmployeeTestingData
   );
+
   byId("goToShiftDetailsBtn")?.addEventListener("click", () => {
     const saved = saveEmployeesToStorage();
+
     if (saved) {
       window.location.href = "../Shift Details/ShiftDetails.html";
     }

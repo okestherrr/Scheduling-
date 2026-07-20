@@ -412,7 +412,7 @@ function getTermNumber() {
 }
 
 //turns time into minutes
-function timeTextToMinutes(timeText) {
+function parse24HourTimeToMinutes(timeText) {
   if (!timeText || timeText === "NULL") {
     return null;
   }
@@ -423,6 +423,12 @@ function timeTextToMinutes(timeText) {
     return null;
   }
   return (hourNumber * 60) + minuteNumber;
+}
+
+
+//turns time into minutes
+function timeTextToMinutes(timeText) {
+  return parse24HourTimeToMinutes(timeText);
 }
 
 //formats clock time
@@ -502,19 +508,16 @@ function showChosenClasses(classList) {
 
 //reads time input
 function parseTimeInputToMinutes(timeText) {
-  if (!timeText || !timeText.includes(":")) {
+  const parsedMinutes = parse24HourTimeToMinutes(timeText);
+  if (parsedMinutes === null) {
     return null;
   }
-  const [hourText, minuteText] = timeText.split(":");
-  const hours = Number(hourText);
-  const minutes = Number(minuteText);
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return null;
-  }
+  const hours = Math.floor(parsedMinutes / 60);
+  const minutes = parsedMinutes % 60;
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
     return null;
   }
-  return (hours * 60) + minutes;
+  return parsedMinutes;
 }
 
 

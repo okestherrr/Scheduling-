@@ -3,10 +3,8 @@ import pandas as pd
 from itertools import product
 import re
 from pathlib import Path
-
 COMPONENTS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = COMPONENTS_DIR.parent
-
 app = Flask(__name__, static_folder=str(PROJECT_ROOT), static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 
@@ -16,13 +14,11 @@ MAX_SCHEDULE_RESULTS = 5
 MAX_SCHEDULE_PAGE_SIZE = 25
 MINUTES_BETWEEN_CLASSES = 15
 SHOW_DETAILED_ERRORS = False
-
 TABLES_DIR = PROJECT_ROOT / "Sql Tables"
 
 sections = pd.read_csv(TABLES_DIR / "section.csv")
 courses = pd.read_csv(TABLES_DIR / "course.csv")
 teachers = pd.read_csv(TABLES_DIR / "teacher.csv")
-
 sections.columns = sections.columns.str.strip()
 courses.columns = courses.columns.str.strip()
 teachers.columns = teachers.columns.str.strip()
@@ -32,224 +28,14 @@ merged_rows = merged_rows.merge(teachers, on='teacher_id')
 
 class_codes = list(dict.fromkeys(str(course_number).upper() for course_number in courses['course_number']))
 
-
 #normalizes the course code
 def normalizeCourseCode(code_text):
     return re.sub(r"[^A-Z0-9]", "", str(code_text).upper())
-
 
 normalized_code_map = {}
 for saved_code in class_codes:
     normalized = normalizeCourseCode(saved_code)
     normalized_code_map.setdefault(normalized, []).append(saved_code)
-
-
-@app.route("/")
-#homepage
-def home():
-    return app.send_static_file("Homepage/homepage.html")
-
-
-@app.after_request
-#cors settings
-def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-    return response
-
-
-#returns a bad request message
-def makeBadRequest(message, **extra_fields):
-    if not SHOW_DETAILED_ERRORS:
-        return jsonify({"error": "Invalid request."}), 400
-
-    payload = {"error": message}
-    payload.update(extra_fields)
-    return jsonify(payload), 400
-
-
-#reads the json request
-def readJsonBody(default_empty=False):
-    body = request.get_json(silent=True)
-    if body is None:
-        return {} if default_empty else None
-    return body if isinstance(body, dict) else None
-
-
-#turns time into minutes
-def timeTextToMinutes(time_text):
-    parts = str(time_text).split(':')
-    return int(parts[0]) * 60 + int(parts[1])
-
-
-#formats the time
-def timeTextToLabel(time_text):
-    if pd.isna(time_text):
-        return None
-    parts = str(time_text).split(':')
-    hour = int(parts[0])
-    minute = int(parts[1])
-    period = "AM"
-    if hour >= 12:
-        period = "PM"
-        if hour > 12:
-            hour = hour - 12
-    if hour == 0:
-        hour = 12
-    return str(hour) + ":" + str(minute).zfill(2) + " " + period
-
-
-#removes empty values
-def cleanCell(value):
-    if pd.isna(value):
-        return None
-    return value
-
-
-#checks if two classes overlap
-def classesConflict(first_day, first_start, first_end, second_day, second_start, second_end):
-    if pd.isna(first_day) or pd.isna(second_day):
-        return False
-    first_day = str(first_day).strip().upper()
-    second_day = str(second_day).strip().upper()
-    if first_day == 'ONLINE' or second_day == 'ONLINE':
-        return False
-    if pd.isna(first_start) or pd.isna(first_end) or pd.isna(second_start) or pd.isna(second_end):
-        return False
-    same_day_found = False
-    for day_letter in first_day:
-        if day_letter in second_day:
-            same_day_found = True
-            break
-    if not same_day_found:
-        return False
-    first_class_start = timeTextToMinutes(first_start)
-    first_class_end = timeTextToMinutes(first_end)
-    second_class_start = timeTextToMinutes(second_start)
-    second_class_end = timeTextToMinutes(second_end)
-    classes_do_not_overlap = (
-        (first_class_end + MINUTES_BETWEEN_CLASSES <= second_class_start)
-        or
-        (second_class_end + MINUTES_BETWEEN_CLASSES <= first_class_start)
-    )
-    return not classes_do_not_overlap
-
-
-#checks the whole schedule for conflicts
-def scheduleHasConflict(schedule_list):
-    for i in range(len(schedule_list)):
-        for j in range(i+1, len(schedule_list)):
-            first_class = schedule_list[i]
-            second_class = schedule_list[j]
-            if classesConflict(
-                first_class['day'], first_class['start_time'], first_class['end_time'],
-                second_class['day'], second_class['start_time'], second_class['end_time']
-            ):
-                return True
-    return False
-
-
-#section information
-def sectionToJson(section):
-    return {
-        "course_number": cleanCell(section["course_number"]),
-        "course_name": cleanCell(section["course_name"]),
-        "section_number": cleanCell(section["section_number"]),
-        "day": cleanCell(section["day"]),
-        "start_time": cleanCell(section["start_time"]),
-        "end_time": cleanCell(section["end_time"]),
-        "start_label": timeTextToLabel(section["start_time"]),
-        "end_label": timeTextToLabel(section["end_time"]),
-        "teacher_name": cleanCell(section["teacher_name"]),
-        "rmp_score": cleanCell(section["rmp_score"]),
-        "difficulty": cleanCell(section["difficulty"]),
-        "ideal": cleanCell(section["ideal"])
-    }
-
-
-#course information
-def courseToJson(course):
-    return {
-        "course_number": cleanCell(course["course_number"]),
-        "course_name": cleanCell(course["course_name"]),
-        "credits": cleanCell(course["credits"])
-    }
-
-
-#reads the term number
-def readTermNumber(raw_term):
-    if raw_term is None or raw_term == "":
-        return None
-    try:
-        return int(raw_term)
-    except (TypeError, ValueError):
-        return None
-
-
-#reads the page settings
-def readPagingValues(raw_start_index, raw_page_size):
-    try:
-        start_index = int(raw_start_index if raw_start_index is not None else 0)
-    except (TypeError, ValueError):
-        start_index = 0
-    try:
-        page_size = int(raw_page_size if raw_page_size is not None else MAX_SCHEDULE_RESULTS)
-    except (TypeError, ValueError):
-        page_size = MAX_SCHEDULE_RESULTS
-    if start_index < 0:
-        start_index = 0
-    if page_size <= 0:
-        page_size = MAX_SCHEDULE_RESULTS
-    if page_size > MAX_SCHEDULE_PAGE_SIZE:
-        page_size = MAX_SCHEDULE_PAGE_SIZE
-    return start_index, page_size
-
-
-#reads locked sections
-def readLockedSections(raw_locked_sections):
-    if not isinstance(raw_locked_sections, list):
-        return {}
-    locked_map = {}
-    for locked_item in raw_locked_sections:
-        if not isinstance(locked_item, dict):
-            continue
-        raw_course_code = locked_item.get("course_number")
-        raw_section_code = locked_item.get("section_number")
-        if not isinstance(raw_course_code, str) or not raw_course_code.strip():
-            continue
-        if not isinstance(raw_section_code, str) or not raw_section_code.strip():
-            continue
-        found_code, problem_type, _ = findCourseCode(raw_course_code)
-        if problem_type:
-            continue
-        locked_map[found_code] = raw_section_code.strip().upper()
-    return locked_map
-
-
-#teacher class information
-def teacherClassToJson(section):
-    day_text = cleanCell(section["day"])
-    start_time = cleanCell(section["start_time"])
-    end_time = cleanCell(section["end_time"])
-    if day_text == "ONLINE":
-        meeting_text = "ONLINE"
-    else:
-        start_label = timeTextToLabel(start_time)
-        end_label = timeTextToLabel(end_time)
-        meeting_text = f"{day_text} {start_label} - {end_label}"
-    return {
-        "course_number": cleanCell(section["course_number"]),
-        "course_name": cleanCell(section["course_name"]),
-        "section_number": cleanCell(section["section_number"]),
-        "term": cleanCell(section["term"]),
-        "meeting": meeting_text,
-        "day": day_text,
-        "start_label": timeTextToLabel(start_time),
-        "end_label": timeTextToLabel(end_time),
-        "tricky_scale": cleanCell(section["tricky_scale"])
-    }
-
 
 #builds the teacher list
 def buildTeacherList(query_text, term_filter):
@@ -280,6 +66,10 @@ def buildTeacherList(query_text, term_filter):
 
     return teacher_items
 
+@app.route("/")
+#homepage
+def home():
+    return app.send_static_file("Homepage/homepage.html")
 
 #finds the course code
 def findCourseCode(user_text):
@@ -303,15 +93,9 @@ def findCourseCode(user_text):
             return None, "ambiguous", matching_codes
     return None, "missing", None
 
-
 #removes duplicate course codes
 def dedupeCourseCodes(code_list):
-    unique_codes = []
-    for class_code in code_list:
-        if class_code not in unique_codes:
-            unique_codes.append(class_code)
-    return unique_codes
-
+    return list(dict.fromkeys(code_list))
 
 #checks requested courses
 def validateRequestedCourses(requested_codes):
@@ -320,14 +104,11 @@ def validateRequestedCourses(requested_codes):
         if not isinstance(typed_code, str):
             return None, makeBadRequest("Invalid courses.")
         found_code, problem_type, _ = findCourseCode(typed_code)
-        if problem_type == "empty":
-            return None, makeBadRequest("Invalid courses.")
-        if problem_type in ["ambiguous", "missing"]:
+        if problem_type in ["empty", "ambiguous", "missing"]:
             return None, makeBadRequest("Invalid courses.")
         good_codes.append(found_code)
 
     return dedupeCourseCodes(good_codes), None
-
 
 #gets sections for each course
 def getSectionsForCourses(code_list, term_filter, locked_sections):
@@ -349,7 +130,6 @@ def getSectionsForCourses(code_list, term_filter, locked_sections):
         if len(class_sections) == 0:
             missing_codes.append(class_code)
     return sections_for_each_code, missing_codes
-
 
 #finds schedules without conflicts
 def findValidSchedules(sections_for_each_code, start_index, page_size):
@@ -378,32 +158,205 @@ def findValidSchedules(sections_for_each_code, start_index, page_size):
         has_more = True
     return valid_schedules_page, has_more
 
+#checks if two classes overlap
+def classesConflict(first_day, first_start, first_end, second_day, second_start, second_end):
+    if pd.isna(first_day) or pd.isna(second_day):
+        return False
+    first_day = str(first_day).strip().upper()
+    second_day = str(second_day).strip().upper()
+    if first_day == 'ONLINE' or second_day == 'ONLINE':
+        return False
+    if pd.isna(first_start) or pd.isna(first_end) or pd.isna(second_start) or pd.isna(second_end):
+        return False
+    if not any(day_letter in second_day for day_letter in first_day):
+        return False
+    first_class_start = timeTextToMinutes(first_start)
+    first_class_end = timeTextToMinutes(first_end)
+    second_class_start = timeTextToMinutes(second_start)
+    second_class_end = timeTextToMinutes(second_end)
+    classes_do_not_overlap = (
+        (first_class_end + MINUTES_BETWEEN_CLASSES <= second_class_start)
+        or
+        (second_class_end + MINUTES_BETWEEN_CLASSES <= first_class_start)
+    )
+    return not classes_do_not_overlap
+
+#checks the whole schedule for conflicts
+def scheduleHasConflict(schedule_list):
+    for i in range(len(schedule_list)):
+        for j in range(i+1, len(schedule_list)):
+            first_class = schedule_list[i]
+            second_class = schedule_list[j]
+            if classesConflict(
+                first_class['day'], first_class['start_time'], first_class['end_time'],
+                second_class['day'], second_class['start_time'], second_class['end_time']
+            ):
+                return True
+    return False
+
+@app.after_request
+#cors help
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    return response
+
+#returns a bad request error
+def makeBadRequest(message, **extra_fields):
+    if not SHOW_DETAILED_ERRORS:
+        return jsonify({"error": "Invalid request."}), 400
+
+    payload = {"error": message}
+    payload.update(extra_fields)
+    return jsonify(payload), 400
+
+#reads the json request
+def readJsonBody(default_empty=False):
+    body = request.get_json(silent=True)
+    if body is None:
+        return {} if default_empty else None
+    if not isinstance(body, dict):
+        return None
+    return body
+
+#turns time into minutes
+def timeTextToMinutes(time_text):
+    hour_text, minute_text = str(time_text).split(':')
+    return int(hour_text) * 60 + int(minute_text)
+
+#formats the time
+def timeTextToLabel(time_text):
+    if pd.isna(time_text):
+        return None
+    parts = str(time_text).split(':')
+    hour = int(parts[0])
+    minute = int(parts[1])
+    period = "AM"
+    if hour >= 12:
+        period = "PM"
+        if hour > 12:
+            hour = hour - 12
+    if hour == 0:
+        hour = 12
+    return str(hour) + ":" + str(minute).zfill(2) + " " + period
+
+#removes empty values
+def cleanCell(value):
+    return None if pd.isna(value) else value
+
+#section information
+def sectionToJson(section):
+    return {
+        "course_number": cleanCell(section["course_number"]),
+        "course_name": cleanCell(section["course_name"]),
+        "section_number": cleanCell(section["section_number"]),
+        "day": cleanCell(section["day"]),
+        "start_time": cleanCell(section["start_time"]),
+        "end_time": cleanCell(section["end_time"]),
+        "start_label": timeTextToLabel(section["start_time"]),
+        "end_label": timeTextToLabel(section["end_time"]),
+        "teacher_name": cleanCell(section["teacher_name"]),
+        "rmp_score": cleanCell(section["rmp_score"]),
+        "difficulty": cleanCell(section["difficulty"]),
+        "ideal": cleanCell(section["ideal"])
+    }
+
+#course information
+def courseToJson(course):
+    return {
+        "course_number": cleanCell(course["course_number"]),
+        "course_name": cleanCell(course["course_name"]),
+        "credits": cleanCell(course["credits"])
+    }
+
+#reads the term number
+def readTermNumber(raw_term):
+    if raw_term is None or raw_term == "":
+        return None
+    try:
+        return int(raw_term)
+    except (TypeError, ValueError):
+        return None
+
+#reads the page settings
+def readPagingValues(raw_start_index, raw_page_size):
+    try:
+        start_index = int(raw_start_index if raw_start_index is not None else 0)
+    except (TypeError, ValueError):
+        start_index = 0
+    try:
+        page_size = int(raw_page_size if raw_page_size is not None else MAX_SCHEDULE_RESULTS)
+    except (TypeError, ValueError):
+        page_size = MAX_SCHEDULE_RESULTS
+    if start_index < 0:
+        start_index = 0
+    if page_size <= 0:
+        page_size = MAX_SCHEDULE_RESULTS
+    if page_size > MAX_SCHEDULE_PAGE_SIZE:
+        page_size = MAX_SCHEDULE_PAGE_SIZE
+    return start_index, page_size
+
+#reads locked sections
+def readLockedSections(raw_locked_sections):
+    if not isinstance(raw_locked_sections, list):
+        return {}
+    locked_map = {}
+    for locked_item in raw_locked_sections:
+        if not isinstance(locked_item, dict):
+            continue
+        raw_course_code = locked_item.get("course_number")
+        raw_section_code = locked_item.get("section_number")
+        if not isinstance(raw_course_code, str) or not raw_course_code.strip():
+            continue
+        if not isinstance(raw_section_code, str) or not raw_section_code.strip():
+            continue
+        found_code, problem_type, _ = findCourseCode(raw_course_code)
+        if problem_type:
+            continue
+        locked_map[found_code] = raw_section_code.strip().upper()
+    return locked_map
+
+#teacher class information
+def teacherClassToJson(section):
+    day_text = cleanCell(section["day"])
+    start_time = cleanCell(section["start_time"])
+    end_time = cleanCell(section["end_time"])
+    if day_text == "ONLINE":
+        meeting_text = "ONLINE"
+    else:
+        start_label = timeTextToLabel(start_time)
+        end_label = timeTextToLabel(end_time)
+        meeting_text = f"{day_text} {start_label} - {end_label}"
+    return {
+        "course_number": cleanCell(section["course_number"]),
+        "course_name": cleanCell(section["course_name"]),
+        "section_number": cleanCell(section["section_number"]),
+        "term": cleanCell(section["term"]),
+        "meeting": meeting_text,
+        "day": day_text,
+        "start_label": timeTextToLabel(start_time),
+        "end_label": timeTextToLabel(end_time),
+        "tricky_scale": cleanCell(section["tricky_scale"])
+    }
 
 #schedule information
 def schedulesToJson(schedule_list):
-    ready_schedules = []
-    for one_schedule in schedule_list:
-        ready_schedule = []
-        for class_section in one_schedule:
-            ready_schedule.append(sectionToJson(class_section))
-        ready_schedules.append(ready_schedule)
-    return ready_schedules
-
+    return [
+        [sectionToJson(class_section) for class_section in one_schedule]
+        for one_schedule in schedule_list
+    ]
 
 @app.route("/courses", methods=["GET"])
 #gets all courses
 def get_courses():
-    course_items = []
-    for _, course in courses.iterrows():
-        course_items.append(courseToJson(course))
+    course_items = [courseToJson(course) for _, course in courses.iterrows()]
     course_items.sort(key=sortCourseItem)
     return jsonify({"courses": course_items})
-
 
 #sorts course numbers
 def sortCourseItem(course_item):
     return str(course_item["course_number"])
-
 
 @app.route("/schedule", methods=["POST"])
 #builds the schedule
@@ -450,7 +403,6 @@ def buildSchedule():
         ]
     })
 
-
 @app.route("/teachers/search", methods=["POST"])
 #finds matching teachers
 def findTeachers():
@@ -467,7 +419,6 @@ def findTeachers():
         "count": len(teacher_items),
         "term": term_filter
     })
-
 
 if __name__ == "__main__":
     app.run(debug=True)
