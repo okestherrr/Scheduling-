@@ -12,11 +12,17 @@ function loadSavedEmployees() {
     if (!raw) {
       return [];
     }
-
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch (_error) {
     return [];
+  }
+}
+
+//sets a default time when an input is empty
+function setDefaultTime(inputBox, defaultValue) {
+  if (inputBox && !inputBox.value) {
+    inputBox.value = defaultValue;
   }
 }
 
@@ -26,23 +32,14 @@ function initShiftDetailsPage() {
   byId("editEmployeesBtn")?.addEventListener("click", () => {
     window.location.href = "../Employee Details/WorkScheduler.html";
   });
-
   //default business hours
   const businessStartInput = byId("workBusinessStart");
   const businessEndInput = byId("workBusinessEnd");
-
-  if (businessStartInput && !businessStartInput.value) {
-    businessStartInput.value = "09:00";
-  }
-
-  if (businessEndInput && !businessEndInput.value) {
-    businessEndInput.value = "20:00";
-  }
-
+  setDefaultTime(businessStartInput, "09:00");
+  setDefaultTime(businessEndInput, "20:00");
   //checks for saved employees
   const employees = loadSavedEmployees();
   const messageBox = byId("workMessage");
-
   if (!employees.length && messageBox) {
     messageBox.textContent = "No saved employees found. Add employees first.";
   }

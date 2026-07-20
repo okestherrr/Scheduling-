@@ -1,14 +1,14 @@
 const welcomeCourseButton = document.getElementById("welcomeCourseBtn");
 const welcomeWorkButton = document.getElementById("welcomeWorkBtn");
 
-if (welcomeCourseButton) {
-  welcomeCourseButton.addEventListener("click", () => {
-    window.location.href = "../Course Scheduler/courseScheduler.html";
+function bindRedirect(buttonBox, nextPath) {
+  if (!buttonBox) {
+    return;
+  }
+  buttonBox.addEventListener("click", () => {
+    window.location.href = nextPath;
   });
 }
 
-if (welcomeWorkButton) {
-  welcomeWorkButton.addEventListener("click", () => {
-    window.location.href = "../Work Scheduler/Employee Details/WorkScheduler.html";
-  });
-}
+bindRedirect(welcomeCourseButton, "../Course Scheduler/courseScheduler.html");
+bindRedirect(welcomeWorkButton, "../Work Scheduler/Employee Details/WorkScheduler.html");
